@@ -1,0 +1,48 @@
+<div class="grid col-2">
+    <div id="controls">
+        <label for="tools">Tools:</label>
+        <div id="tools">
+            <div class="grid col-2">
+                <button title="Undo" id="undo"><i class="fa-sharp-duotone fa-regular fa-arrow-u-turn-up-left"></i></button>
+                <button title="Redo" id="redo"><i class="fa-sharp-duotone fa-regular fa-arrow-u-turn-up-right"></i></button>
+            </div>
+            <button title="Pen" id="pen"><i class="fa-duotone fa-regular fa-paintbrush"></i></button>
+            <button title="Pencil" id="pencil"><i class="fa-duotone fa-regular fa-pencil"></i></button>
+            <button title="Eraser" id="eraser"><i class="fa-duotone fa-regular fa-eraser"></i></button>
+            <button title="Selection" id="selecter"><i class="fa-sharp-duotone fa-light fa-square-dashed"></i></button>
+            <button title="Eyedropper" id="eyedropper"><i class="fa-sharp-duotone fa-regular fa-eye-dropper-half"></i></button>
+        </div>
+        <label for="color-select">Color:</label>
+        <div id="color-select">
+            <input id="color-picker" oninput="set_color(this.parentNode)" type="color" data-color="black">
+            <input id="alpha-picker" oninput="set_color(this.parentNode)" type="range" min="0" max="255" step="1" value="255" />
+        </div>
+        <label for="stroke_width">Size: <span id="current_stroke_width">4</span></label>
+        <input type="range" value="4" min="1" max="100" step="1" id="stroke-width-picker" class="stroke_width_picker" name="stroke_width" list="stroke_markers" />
+        <datalist id="markers">
+            <option value="1"></option>
+            <option value="25"></option>
+            <option value="50"></option>
+            <option value="75"></option>
+            <option value="100"></option>
+        </datalist>
+        <select name="layer_select" id="layer_select">
+        </select>
+    </div>
+        <div id="zoomwrap">
+            <div id="art">
+            </div>
+        </div>
+</div>
+ <div id="chat">
+    <div id="chatbox">
+        <div id="chatwrap">
+            <ul>
+            </ul>
+        </div>
+        <div id="chatinput">
+            <input type="text" id="chatmsg" placeholder="Chat..."/><button id="chatsend">Send</button>
+        </div>
+    </div>
+    <div id="users"></div>
+</div>

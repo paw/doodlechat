@@ -1,0 +1,200 @@
+body {
+    background-color: #222222;
+    font-size: 26px;
+}
+
+.wrapper {
+    max-width: 1200px;
+    background-color: rgb(34, 34, 34);
+    margin: 0 auto;
+    padding: 10px;
+}
+
+header, footer {
+    background-color: ghostwhite;
+    padding: 20px;
+}
+
+main {
+    background: gainsboro;
+}
+#art {
+    background: 
+    repeating-conic-gradient(#c0c0c0 0 25%, #b0b0b000 0 50%) 
+      50% / 20px 20px;
+}
+
+.layout-sidebar {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 2fr 1fr;
+}
+.nav, .toolbar {
+    list-style-type: none;
+}
+nav.navbar {
+    position: sticky;
+    z-index: 1;
+    top: 0px;
+    left: 0px;
+    background-color: ghostwhite;
+}
+nav.navbar .nav, nav.navbar .toolbar {
+    display: flex;
+    flex-direction: row;
+    grid-gap: 0.5em;
+}
+nav.navbar .toolbar .subnav, .subnav .dropdown {
+    position: relative;
+}
+side.navbar .nav, .toolbar .subnav .dropdown {
+    display: flex;
+    flex-direction: column;
+    grid-gap: 0.5em;
+}
+.toolbar .subnav .dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0px;
+    list-style-type: none;
+    background: ghostwhite;
+    border: 1px solid #ccc;
+}
+.toolbar .subnav .dropdown li:nth-child(2n+1) {
+    background: #fff;
+}
+.toolbar .subnav .dropdown.show {
+    display: flex;
+}
+#art {
+    width: var(--width);
+    height: var(--height);
+    position: relative;
+}
+canvas {
+    position: relative;
+    top: 0;
+    left: 0;
+    z-index: var(--z-index);
+}
+#layer_list {
+	display: flex;
+	list-style: none;
+	grid-gap: 0.5em;
+	flex-direction: row;
+}
+#layer_list li {
+    opacity: 0.5;
+}
+#layer_list li.active {
+    opacity: 1;
+}
+
+input.call-picker {
+  border: 1px solid #AAA;
+  color: #666;
+  text-transform: uppercase;
+  float: left;
+  outline: none;
+  padding: 10px;
+  text-transform: uppercase;
+  width: 85px;
+}
+
+.color-picker {
+  width: 130px;
+  background: #F3F3F3;
+  height: 81px;
+  padding: 5px;
+  border: 5px solid #fff;
+  box-shadow: 0px 0px 3px 1px #DDD;
+  position: absolute;
+  top: 61px;
+  left: 2px;
+}
+
+.color-holder {
+  background: #fff;
+  cursor: pointer;
+  border: 1px solid #AAA;
+  width: 40px;
+  height: 36px;
+  float: left;
+  margin-left: 5px;
+}
+
+input.stroke_width_picker {
+  border: 1px solid #AAA;
+  color: #666;
+  text-transform: uppercase;
+  float: left;
+  outline: none;
+  padding: 10px;
+  text-transform: uppercase;
+  width: 85px;
+}
+#controls, #tools {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+}
+#controls {
+    width: auto
+}
+#tools button {
+    font-size: 3rem;
+    margin: 0.5rem;
+}
+#color-select {
+  background-color: black;
+  display: inline-block;
+  visibility: hidden;
+}
+
+#color-select::before {
+  content: "";
+  position: absolute;
+  border-radius: 3px;
+  outline: black solid 2px;
+  border: white solid 3px;
+  height: 2rem;
+  width: 2rem;
+  pointer-events: none;
+  background-color: inherit;
+  visibility: visible;
+  box-sizing: border-box;
+}
+
+#color-picker {
+  opacity: 0;
+  height: 2rem;
+  width: 2rem;
+  box-sizing: border-box;
+  pointer-events: initial;
+  visibility: visible;
+}
+
+
+#alpha-picker {
+  filter: grayscale(100%);
+  visibility: visible;
+}
+.grid {
+    display: grid;
+	align-items: flex-start;
+}
+.col-2 {
+	grid-template-columns: auto auto;
+}
+.col-3 {
+	grid-template-columns: auto auto auto;
+}
+
+p {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+button {
+  margin-left: 1rem;
+}

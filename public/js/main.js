@@ -1,0 +1,27 @@
+function ready() {
+    document.querySelectorAll(".subnav").forEach(option => {
+        option.querySelector("button").addEventListener("click", (event) => {
+            document.querySelectorAll(`.dropdown.show:not([data-menu="${option.getAttribute("data-menu")}"])`).forEach(dropdown => {
+                dropdown.classList.remove("show")
+            });
+            option.querySelector(".dropdown").classList.toggle("show");
+        });
+    })
+    document.querySelectorAll(".dropdown li").forEach(option => {
+        option.addEventListener("click", (event) => {
+            console.log(option.getAttribute("data-action"));
+        });
+    })
+
+    /*// layer creation
+    */
+};
+
+// this is required for the (not so) edge case where your script is loaded after the document has loaded
+// https://developer.mozilla.org/en/docs/Web/API/Document/readyState
+if (document.readyState !== 'loading') {
+  ready()
+} else {
+  // the document hasn't finished loading/parsing yet so let's add an event handler
+  document.addEventListener('DOMContentLoaded', ready)
+}
