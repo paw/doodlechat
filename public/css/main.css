@@ -1,13 +1,19 @@
+* {
+    box-sizing: border-box;
+}
+body, html {
+    padding: 0;
+    margin: 0
+}
 body {
     background-color: #222222;
-    font-size: 26px;
+    font-size: 16px;
 }
 
 .wrapper {
-    max-width: 1200px;
+    width:100vw;
     background-color: rgb(34, 34, 34);
     margin: 0 auto;
-    padding: 10px;
 }
 
 header, footer {
@@ -19,9 +25,7 @@ main {
     background: gainsboro;
 }
 #art {
-    background: 
-    repeating-conic-gradient(#c0c0c0 0 25%, #b0b0b000 0 50%) 
-      50% / 20px 20px;
+    border: 1px solid #ccc;
 }
 
 .layout-sidebar {
@@ -31,13 +35,15 @@ main {
 }
 .nav, .toolbar {
     list-style-type: none;
+    margin: none;
 }
-nav.navbar {
+nav.navbar:has(.toolbar) {
     position: sticky;
     z-index: 1;
     top: 0px;
     left: 0px;
-    background-color: ghostwhite;
+    background-color: rgba(248,248,255,0.8);
+    height: 32px;
 }
 nav.navbar .nav, nav.navbar .toolbar {
     display: flex;
@@ -60,6 +66,9 @@ side.navbar .nav, .toolbar .subnav .dropdown {
     list-style-type: none;
     background: ghostwhite;
     border: 1px solid #ccc;
+}
+ul.toolbar {
+    margin: 0
 }
 .toolbar .subnav .dropdown li:nth-child(2n+1) {
     background: #fff;
@@ -137,14 +146,20 @@ input.stroke_width_picker {
 #controls, #tools {
     display: flex;
     flex-wrap: wrap;
-    flex-direction: column;
+    flex-direction: row;
+    grid-gap: 5px;
+    align-items: center;
 }
 #controls {
-    width: auto
+    width: auto;
+    background: rgba(248,248,255,0.8)
 }
 #tools button {
-    font-size: 3rem;
-    margin: 0.5rem;
+    font-size: 1rem;
+    margin: 0.2rem;
+}
+#tools button i {
+    font-size: 1.7rem
 }
 #color-select {
   background-color: black;

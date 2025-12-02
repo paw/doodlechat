@@ -27,12 +27,15 @@ app.use(express.urlencoded());
 app.use(express.json());
 
 const server = http.createServer(app)
+
 server.on('listening', () => {
  console.log('Listening on port 3000')
 })
 
 // Web sockets
-const io = require('socket.io')(server)
+const io = require('socket.io')(server, {
+  maxHttpBufferSize: 1e8    // 100 MB
+});
 
 // our custom "verbose errors" setting
 // which we can use in the templates
@@ -75,8 +78,12 @@ io.sockets.on('connection', (socket) => {
   });
 
 
-  socket.on('canvas_action', (data) => {
-    socket.broadcast.emit('canvas_action', data);
+  socket.on('send_canvas_action', (data) => {
+    socket.broadcast.emit('get_canvas_action', data);
+    global_actions_stack.push(data);
+  });
+  socket.on('send_finalized_action', (data) => {
+    socket.broadcast.emit('get_finalized_action', data);
     global_actions_stack.push(data);
   });
 
@@ -85,7 +92,21 @@ io.sockets.on('connection', (socket) => {
     global_chat_stack.push(data);
   });
 
- socket.on('disconnect', () => {
+ socket.on("disconnect", (reason, details) => {
+  try {// the reason of the disconnection, for example "transport error"
+  console.log(reason);
+
+  // the low-level reason of the disconnection, for example "xhr post error"
+  console.log(details.message);
+
+  // some additional description, for example the status code of the HTTP response
+  console.log(details.description);
+
+  // some additional context, for example the XMLHttpRequest object
+  console.log(details.context);
+  } catch(err) {
+    
+  }
     console.log('Client has disconnected');
     let found = connections.find((element) => element.socket_id == socket.id);
     console.log(connections);
