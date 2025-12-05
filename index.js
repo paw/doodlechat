@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 3000;
 var connections = [],
     userdata = [],
     layerstates = [],
+    global_midpoint_stack = [],
     global_actions_stack = [],
     global_chat_stack = [];
 
@@ -80,11 +81,19 @@ io.sockets.on('connection', (socket) => {
 
   socket.on('send_canvas_action', (data) => {
     socket.broadcast.emit('get_canvas_action', data);
-    global_actions_stack.push(data);
+    global_midpoint_stack.push(data);
   });
   socket.on('send_finalized_action', (data) => {
     socket.broadcast.emit('get_finalized_action', data);
     global_actions_stack.push(data);
+  });
+  socket.on('undo', (data) => {
+    socket.broadcast.emit('get_undo', data);
+    global_actions_stack.filter(ele => {ele.id == data.id}).undid = true;
+  });
+  socket.on('redo', (data) => {
+    socket.broadcast.emit('get_redo', data);
+    global_actions_stack.filter(ele => {ele.id == data.id}).undid = false;
   });
 
   socket.on('send_chat_message', (data) => {
@@ -93,21 +102,23 @@ io.sockets.on('connection', (socket) => {
   });
 
  socket.on("disconnect", (reason, details) => {
-  try {// the reason of the disconnection, for example "transport error"
-  console.log(reason);
+  console.log('Client has disconnected');
+  try {
+    // the reason of the disconnection, for example "transport error"
+    console.log(reason);
 
-  // the low-level reason of the disconnection, for example "xhr post error"
-  console.log(details.message);
+    // the low-level reason of the disconnection, for example "xhr post error"
+    console.log(details.message);
 
-  // some additional description, for example the status code of the HTTP response
-  console.log(details.description);
+    // some additional description, for example the status code of the HTTP response
+    console.log(details.description);
 
-  // some additional context, for example the XMLHttpRequest object
-  console.log(details.context);
+    // some additional context, for example the XMLHttpRequest object
+    console.log(details.context);
   } catch(err) {
-    
+    // if they didn't disconnect with details it wasn't a disconnect in error
   }
-    console.log('Client has disconnected');
+    // remove them from the list
     let found = connections.find((element) => element.socket_id == socket.id);
     console.log(connections);
     let removed = connections.indexOf(found);

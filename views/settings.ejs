@@ -1,6 +1,7 @@
 <div>
-    <label for="username">Username:</label><input type="text" id="user" name="username" placeholder="Artist" value=""/>
-    <label for="color">Color:</label><input type="text" name="color" id="ucolor" placeholder="#000000" value="">
+    <label for="username">Username:</label><input type="text" id="user" name="username" placeholder="Artist" value="" minlength="1"
+  maxlength="20" required/>
+    <label for="color">Color:</label><input type="text" name="color" id="ucolor" placeholder="#000000" value="" required>
     <div id="preview"></div>
     <button id="save">Save</button><button id="previewer">Preview</button>
 </div>

@@ -1,10 +1,3 @@
-function bubble(x, y, r, s) {
-  this.x = x;
-  this.y = y;
-  this.r = r;
-  this.s = s;
-}
-
 function drawUsername(user,pos) {
   textSize(32);
   fill(255);
@@ -14,7 +7,24 @@ function drawUsername(user,pos) {
 }
 
 function drawUI() {
-  UI_LAYER.clear()
+  UI_LAYER.clear();
+  
+
+  if (current_tool == 'eraser') {
+    CANVAS.classList = 'p5Canvas eraser'
+  } else if (current_tool == 'eyedropper') {
+    CANVAS.classList = 'p5Canvas dropper'
+  } else{
+    CANVAS.classList = 'p5Canvas'
+    push()
+    UI_LAYER.fill(colorPicker.value(),alphaSlider.value())
+    if(current_tool == 'pencil') {
+      UI_LAYER.square(parseInt(mouseX - strokeWidth / 2), parseInt(mouseY - strokeWidth / 2), strokeWidth);
+    } else {
+      UI_LAYER.ellipse(parseInt(mouseX), parseInt(mouseY), strokeWidth, strokeWidth);
+    }
+    pop();
+  }
   
   UI_LAYER.fill(ucolor);
   UI_LAYER.stroke(0);

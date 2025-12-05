@@ -37,6 +37,9 @@ main {
     list-style-type: none;
     margin: none;
 }
+.navbar {
+    background: #ccc;
+}
 nav.navbar:has(.toolbar) {
     position: sticky;
     z-index: 1;
@@ -49,6 +52,7 @@ nav.navbar .nav, nav.navbar .toolbar {
     display: flex;
     flex-direction: row;
     grid-gap: 0.5em;
+    margin: 0;
 }
 nav.navbar .toolbar .subnav, .subnav .dropdown {
     position: relative;
@@ -56,7 +60,6 @@ nav.navbar .toolbar .subnav, .subnav .dropdown {
 side.navbar .nav, .toolbar .subnav .dropdown {
     display: flex;
     flex-direction: column;
-    grid-gap: 0.5em;
 }
 .toolbar .subnav .dropdown {
     display: none;
@@ -66,12 +69,24 @@ side.navbar .nav, .toolbar .subnav .dropdown {
     list-style-type: none;
     background: ghostwhite;
     border: 1px solid #ccc;
+    padding: 0;
 }
-ul.toolbar {
-    margin: 0
+.toolbar .subnav .dropdown li {
+    border-bottom:1px solid #ccc;
+    padding: 0.2em 0.5em;
+    cursor: pointer;
 }
 .toolbar .subnav .dropdown li:nth-child(2n+1) {
     background: #fff;
+}
+.toolbar .subnav .dropdown li:hover {
+    background: rgb(254, 243, 201);
+}
+.toolbar .subnav .dropdown li:last-child {
+    border: none;
+}
+ul.toolbar, ol, ul {
+    margin: 0
 }
 .toolbar .subnav .dropdown.show {
     display: flex;
@@ -86,6 +101,8 @@ canvas {
     top: 0;
     left: 0;
     z-index: var(--z-index);
+    user-select: none;
+    cursor: none;
 }
 #layer_list {
 	display: flex;
@@ -161,10 +178,20 @@ input.stroke_width_picker {
 #tools button i {
     font-size: 1.7rem
 }
+#tools button.active {
+    background: rgb(254, 243, 201);
+}
 #color-select {
   background-color: black;
   display: inline-block;
   visibility: hidden;
+}
+
+.dropper {
+    cursor: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' fill='var(--color)' transform='rotate(90)' viewBox='0 0 512 512'%3e%3cpath opacity='.4' d='M266.9 169L372.1 63.8c10.1-10.1 23.8-15.8 38.1-15.8 29.7 0 53.8 24.1 53.8 53.8 0 14.3-5.7 28-15.8 38.1L343 245.1 266.9 169z'/%3e%3cpath d='M208 177.9c-12.3-12.3-22.1-22.1-33.9-33.9l33.9-33.9 25 25c16.4-16.4 51.5-51.5 105.2-105.2 19.1-19.1 45-29.8 72-29.8 56.2 0 101.8 45.6 101.8 101.8 0 27-10.7 52.9-29.8 72-53.7 53.7-88.8 88.8-105.2 105.2 3.8 3.8 12.2 12.2 25 25L368 337.9c-45.4-45.4-76.9-76.9-135-135l-25-25zm58.9-9L343 245.1 448.2 139.9c10.1-10.1 15.8-23.8 15.8-38.1 0-29.7-24.1-53.8-53.8-53.8-14.3 0-28 5.7-38.1 15.8L266.9 169zm-97.8 37.9l33.9 33.9-79.1 79.1 136.2 0 11-11 33.9 33.9-137.1 137.1-88 0-48 32-32-32 32-48 0-88 137.1-137.1z'/%3e%3c/svg%3e") 0 0, pointer;
+}
+.eraser {
+    cursor: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' fill='var(--ucolor)' viewBox='0 0 576 512'%3e%3cpath d='M178.5 416l123 0 65.3-65.3-173.5-173.5-126.7 126.7 112 112zM224 480l-45.5 0c-17 0-33.3-6.7-45.3-18.7L17 345C6.1 334.1 0 319.4 0 304s6.1-30.1 17-41L263 17C273.9 6.1 288.6 0 304 0s30.1 6.1 41 17L527 199c10.9 10.9 17 25.6 17 41s-6.1 30.1-17 41l-135 135 120 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-288 0z'/%3e%3c/svg%3e") 0 0, pointer;
 }
 
 #color-select::before {
@@ -204,6 +231,33 @@ input.stroke_width_picker {
 }
 .col-3 {
 	grid-template-columns: auto auto auto;
+}
+
+#chat {
+	position: fixed;
+	bottom: 1em;
+	left: 1em;
+	background: #fff;
+	width: 300px;
+	word-wrap: break-word;
+	border-radius: 5px;
+	padding: 0.2em;
+}
+#chatwrap {
+	height: 200px;
+	overflow: auto;
+}
+#chatwrap ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+#chatwrap li {
+    padding: 0.5em;
+    border-bottom: 1px solid #ccc;
+}
+#users::before {
+    content: 'Connected Users:'
 }
 
 p {

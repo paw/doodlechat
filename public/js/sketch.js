@@ -1,4 +1,5 @@
-const seenActions = new Set();
+const seenActions = new Set(),
+      ACTION_QUEUE = [];
 
 let user,
     current_tool = 'pen',
@@ -17,7 +18,6 @@ let user,
 
     /*IMPORTANT VARS*/
     barHeight = 100,
-    toolsWidth = 165,
     LAYERS = [],
     CANVAS,
     UI_LAYER,
@@ -32,6 +32,7 @@ let user,
     OFFSET,
     MAX_UNDOS = 5,
     BAKE_UNDOS = 3,
+
 
     action_cnt = 0,
 
@@ -55,22 +56,23 @@ function setup() {
 
     // otherwise we get stuff from local storage ^_^
     ucolor = localStorage.getItem('draw-color');
+
+
     // instance mode for layers:
     // https://github.com/processing/p5.js/wiki/
 
-    const wrapper = document.querySelector("#art")
-
     CANVAS = createCanvas(windowHeight, windowHeight).pixelDensity(1);
-    CANVAS.parent(wrapper);
+    frameRate(60); // frame rate cap
+    CANVAS.parent(document.querySelector("#art"));
     ACTIVE_AREA = createGraphics(cWidth,cHeight).pixelDensity(1);
     ACTION_LAYER = createGraphics(cWidth,cHeight).pixelDensity(1);
     CHECKERBOARD = createGraphics(cWidth,cHeight).pixelDensity(1);
     UI_LAYER = createGraphics(windowHeight,windowHeight).pixelDensity(1);
     
-    createCheckerboard(); // fill checkerboard
+    createCheckerboard(); // fill checkerboard background
     
     for (let i = 0; i < STARTING_LAYER_COUNT; i++) {
-        // push empty layer
+        // push empty layers
         let lyr = {
         live : createGraphics(cWidth,cHeight).pixelDensity(1),
         mask: createGraphics(cWidth,cHeight).pixelDensity(1),
@@ -85,8 +87,8 @@ function setup() {
     for (let element of document.getElementsByClassName("p5Canvas")) {
         element.addEventListener("contextmenu", (e) => e.preventDefault());
     }
-    resizeCanvas(windowWidth - toolsWidth, windowHeight - barHeight);
-    UI_LAYER.resizeCanvas(windowWidth - toolsWidth, windowHeight - barHeight)
+    resizeCanvas(windowWidth, windowHeight - barHeight);
+    UI_LAYER.resizeCanvas(windowWidth, windowHeight - barHeight)
     OFFSET = calculateOffset();
     console.log(CANVAS)
 
@@ -128,21 +130,34 @@ function setup() {
         if (seenActions.has(data.id)) return; // ignore our own strokes
         seenActions.add(data.id);
 
-        // Apply remote partial stroke
-        canvasAction(data, false);
+        // Apply remote partial stroke, not live if we're actively drawing on same layer to prevent a race condition
+        if (data.layer != current_layer && !isDrawing) {
+          canvasAction(data, false);
+        }
     });
+
 
     socket.on("get_finalized_action", data => {
         if (!data || !data.id) return;
         if (seenActions.has(data.id)) return;
         seenActions.add(data.id);
         console.log(`Final stroke received from ${data.username}`);
+        // recreate image?
         data.img = createSpriteFromPixelsArray(data)
-
-        LAYERS[data.layer].stroke_history.push(data);
-        UNDO_STACK.push(data);
-        console.log(UNDO_STACK,LAYERS[data.layer].stroke_history)
+        // store in layer array
+        ACTION_QUEUE.push({
+          type: "ADD",
+          action: data
+        });
     });
+
+  socket.on("get_undo", data => {
+    ACTION_QUEUE.push({type: "REMOTE_UNDO", action: data})
+  });
+
+  socket.on("get_redo", data => {
+    ACTION_QUEUE.push({type: "REMOTE_REDO", action: data})
+  });
 
 	socket.on('get_canvas_progress', data => {
         console.log("loaded active canvas");
@@ -169,6 +184,8 @@ function setup() {
     colorPicker = select('#color-picker');
     alphaSlider = select('#alpha-picker');
     colorPicker.value('#000');
+
+    document.querySelector("#art").setAttribute("style",`--ucolor: ${ucolor};--color: ${colorPicker.value()};`);
     set_color(document.querySelector("#color-select")); // upodate visuals
 
 	const stroke_width_picker = select('#stroke-width-picker'),
@@ -221,9 +238,9 @@ function setup() {
         console.log(`changed tool: ${current_tool}`);
     })
     clear_button.mouseClicked(() => {
-        console.log(`clear layer: ${currentLayer}`);
-        p5layers[currentLayer].clear();
-        sendCanvasAction(`clear`, 0, 0, cWidth, cHeight);
+        console.log(`clear layer: ${current_layer}`);
+        LAYERS[current_layer].clear();
+        socket.emit('clear_canvas',{layer: current_layer})
     })
     document.querySelector(`[data-action="new-layer"]`).addEventListener("click", (event) => {
         createNewLayer()
@@ -252,8 +269,8 @@ function setup() {
 }
 
 function windowResized() {
-  resizeCanvas(windowWidth - toolsWidth, windowHeight - barHeight);
-  UI_LAYER.resizeCanvas(windowWidth - toolsWidth, windowHeight - barHeight);
+  resizeCanvas(windowWidth, windowHeight - barHeight);
+  UI_LAYER.resizeCanvas(windowWidth, windowHeight - barHeight);
   OFFSET = calculateOffset();
 }
 
@@ -264,6 +281,7 @@ function inCanvasBounds() {
     return false
   }
 }
+
 function inDrawingArea() {
   let scaledX = parseInt((mouseX - OFFSET.x) / ZOOM.scale_factor),
       scaledY = parseInt((mouseY - OFFSET.y) / ZOOM.scale_factor);
@@ -287,52 +305,36 @@ function draw() {
   ACTIVE_AREA.clear();
   background(225);
   drawUI();
-  
-   // if it exceeds max num of undos, bake the first in the stack onto its layer
-  if (UNDO_STACK.length > MAX_UNDOS) {
-    
-    let undoCnt = UNDO_STACK.length;
-    
-    for(let i = 0; i < BAKE_UNDOS; i++) {        
-      firstAction = UNDO_STACK[0];
-      UNDO_STACK.splice(0, 1);
 
-      layer_index = firstAction.layer; 
-      layer = LAYERS[layer_index];
-
-      action_index = layer.stroke_history.indexOf(firstAction);
-      layer.stroke_history.splice(action_index, 1);
-      console.log("Removed at index " + action_index);
-
-      if(firstAction.type == 'eraser') {
-        layer.baked.mask(firstAction.img);        
-      }
-      else {
-        layer.baked.copy(firstAction.img, 0, 0, firstAction.width, firstAction.height, firstAction.x, firstAction.y, firstAction.width, firstAction.height);
-      }
-    }
-    
-    console.log("UNDO STACK: " + UNDO_STACK.length);
-    
+  while (ACTION_QUEUE.length > 0) {
+    let act = ACTION_QUEUE.shift();
+    performAction(act)
   }
   
   ACTIVE_AREA.image(CHECKERBOARD,0,0)
   
   // draw LAYERS
   LAYERS.forEach((layer, index) => {
+    // must add a check because of a slight lag between removing a layer + the draw loop that causes drawing to fail
     if (!layer.removed) {
-      // must add a check because of a slight lag between removing a layer + the draw loop that causes drawing to fail
+
+   
+    
+    //... THEN WE REDRAW THE LAYER FOR DISPLAY
     let temp_image = redrawLayer(layer),
         liveImage = createImage(layer.live.width, layer.live.height).pixelDensity(1);
     liveImage.copy(layer.live, 0, 0, layer.live.width, layer.live.height, 0, 0, layer.live.width, layer.live.height);
     
     noSmooth()
+
+    // draw to active area
     ACTIVE_AREA.image(temp_image,0,0)
     ACTIVE_AREA.image(liveImage,0,0)
       
     }
   })
-  // put active image on canvas w/ transforms
+
+  // put active area on canvas w/ transforms
   image(
     ACTIVE_AREA,
     OFFSET.x,
@@ -346,7 +348,8 @@ function draw() {
 
 
 window.addEventListener("wheel", function(e) {
-  if (inCanvasBounds()) {
+  if (inCanvasBounds() && key == SHIFT) {
+    document.body.style = 'overflow: hidden';
     if (e.deltaY > 0) {
       ZOOM.scale_factor *= 0.95;
     } else {
@@ -358,6 +361,8 @@ window.addEventListener("wheel", function(e) {
       ZOOM.scale_factor = 5
     }
     OFFSET = calculateOffset();
+
+    document.body.style = '';
   }
   
   
@@ -376,13 +381,13 @@ function canvasAction(data,local = false) {
   if (data.tool == 'pen') {
     
        // draw to current layer
-    LAYERS[current_layer].live.stroke(red(data.color),green(data.color),blue(data.color),data.alpha)
-    LAYERS[current_layer].live.strokeWeight(data.size)
-    LAYERS[current_layer].live.line(data.px, data.py, data.x, data.y);
+    LAYERS[data.layer].live.stroke(red(data.color),green(data.color),blue(data.color),data.alpha)
+    LAYERS[data.layer].live.strokeWeight(data.size)
+    LAYERS[data.layer].live.line(data.px, data.py, data.x, data.y);
 
-    LAYERS[current_layer].mask.stroke(255,255,255,255)
-    LAYERS[current_layer].mask.strokeWeight(strokeWidth)
-    LAYERS[current_layer].mask.line(data.px, data.py, data.x, data.y);
+    LAYERS[data.layer].mask.stroke(255,255,255,255)
+    LAYERS[data.layer].mask.strokeWeight(strokeWidth)
+    LAYERS[data.layer].mask.line(data.px, data.py, data.x, data.y);
     
     if (local) {
         // also draw to action layer to capture stroke
@@ -400,11 +405,12 @@ function canvasAction(data,local = false) {
 
     
   } else if (data.tool == 'pencil') {
+
+    lineBresenham(LAYERS[data.layer].live, data.px, data.py, data.x, data.y, data.size, [red(data.color),green(data.color),blue(data.color),data.alpha]);
+    lineBresenham(LAYERS[data.layer].mask, data.px, data.py, data.x, data.y, data.size,[255,255,255,data.alpha]);
     
-    lineBresenham(LAYERS[current_layer].live,data.size,[red(data.color),green(data.color),blue(data.color),ualpha]);
-    lineBresenham(LAYERS[current_layer].mask,data.size,[255,255,255,data.alpha]);
     if (local) {
-        lineBresenham(ACTION_LAYER,strokeWidth,[red(data.color),green(data.color),blue(data.color),data.alpha]);
+        lineBresenham(ACTION_LAYER, data.px, data.py, data.x, data.y, data.size, [red(data.color),green(data.color),blue(data.color),data.alpha]);
         
         // Expand bounding box while drawing
         boundingBoxEnd.x = max(boundingBoxEnd.x, data.x);
@@ -412,11 +418,11 @@ function canvasAction(data,local = false) {
         boundingBoxStart.x = min(boundingBoxStart.x, data.x);
         boundingBoxStart.y = min(boundingBoxStart.y, data.y);
     }
-      
     
   } else if (data.tool == 'eraser') {
     
-    lineBresenham(LAYERS[current_layer].mask,data.size,[0,0,0,0]);
+        lineBresenham(LAYERS[data.layer].mask, data.px, data.py, data.x, data.y, data.size,[0,0,0,0]);
+    
     if (local) {
         boundingBoxEnd.x = max(boundingBoxEnd.x, data.x);
         boundingBoxEnd.y = max(boundingBoxEnd.y, data.y);
@@ -426,7 +432,7 @@ function canvasAction(data,local = false) {
 
   } else if (data.tool == 'fill') {
     if (local) {
-        floodScanFill(LAYERS[current_layer],ACTION_LAYER,data.x,data.y,[red(data.color),green(data.color),blue(data.color),data.alpha]);
+        floodScanFill(LAYERS[data.layer],ACTION_LAYER,data.x,data.y,[red(data.color),green(data.color),blue(data.color),data.alpha]);
         boundingBoxEnd.x = LAYERS[current_layer].width;
         boundingBoxEnd.y = LAYERS[current_layer].height;
         boundingBoxStart.x = 0;
@@ -436,13 +442,20 @@ function canvasAction(data,local = false) {
   } else if (data.tool == 'select') {
     rectSelect(UI_LAYER,LAYERS[current_layer])
   }
+  if (!local) {
+    UI_LAYER.fill(data.ucolor);
+    UI_LAYER.stroke(0);
+    UI_LAYER.strokeWeight(4);
+    UI_LAYER.textAlign(LEFT);
+    UI_LAYER.text(data.username, parseInt(data.mouseX)+5, parseInt(data.mouseY)-20);
+  }
 }
 
 function createSpriteFromPixelsArray(data) {
     let img = createImage(data.width, data.height).pixelDensity(1);
     img.loadPixels()
-    const typedArray = new Uint8Array(data.pixels);
-    const src = [...typedArray];
+    const src = new Uint8Array(data.pixels);
+    //const src = [...typedArray];
     for (let y = 0; y <= data.height; y++) {
         for (let x = 0; x <= data.width; x++) {
             let index = (x + y * data.width) * 4;
@@ -556,7 +569,7 @@ function genActId(cnt = 0) {
 }
 
 function mousePressed() {
-  if (mouseButton.left && inCanvasBounds()) {
+  if (mouseButton.left && inDrawingArea()) {
     if (current_tool == 'eyedropper') {
       var selected_pixel = color(redrawLayer(LAYERS[current_layer]).get((mouseX - OFFSET.x) / ZOOM.scale_factor,(mouseY - OFFSET.y) / ZOOM.scale_factor));
         //console.log(selected_pixel);
@@ -567,40 +580,41 @@ function mousePressed() {
         }
     } else {
       isDrawing = true;
-    REDO_STACK = [];
-    boundingBoxStart = {x: mouseX, y: mouseY};
-    boundingBoxEnd = {x: mouseX, y: mouseY};
-    const data = {
-            id: genActId(1),
-            num: action_cnt+1,
-            tool: current_tool,
-            x: parseInt((mouseX - OFFSET.x) / ZOOM.scale_factor),
-            y: parseInt((mouseY - OFFSET.y) / ZOOM.scale_factor),
-            px: parseInt((pmouseX - OFFSET.x) / ZOOM.scale_factor),
-            py: parseInt((pmouseY - OFFSET.y) / ZOOM.scale_factor),
-            size: strokeWidth,
-            color: colorPicker.value(),
-            alpha: alphaSlider.value(),
-            layer: current_layer,
-            username: user,
-            timestamp: Date.now(),
-            finalized: false
-        };
+      REDO_STACK = [];
+      boundingBoxStart = {x: mouseX, y: mouseY};
+      boundingBoxEnd = {x: mouseX, y: mouseY};
+      const data = {
+              id: genActId(1),
+              num: action_cnt+1,
+              tool: current_tool,
+              x: parseInt((mouseX - OFFSET.x) / ZOOM.scale_factor),
+              y: parseInt((mouseY - OFFSET.y) / ZOOM.scale_factor),
+              px: parseInt((pmouseX - OFFSET.x) / ZOOM.scale_factor),
+              py: parseInt((pmouseY - OFFSET.y) / ZOOM.scale_factor),
+              size: strokeWidth,
+              color: colorPicker.value(),
+              alpha: alphaSlider.value(),
+              layer: current_layer,
+              username: user,
+              ucolor: ucolor,
+              timestamp: Date.now(),
+              finalized: false
+          };
 
-        // mark so echoed version doesn't get applied
-        seenActions.add(data.id);
+          // mark so echoed version doesn't get applied
+          seenActions.add(data.id);
 
-        // apply locally
-        canvasAction(data, true);
+          // apply locally
+          canvasAction(data, true);
 
-        // send to server
-        socket.emit("send_canvas_action", data);
+          // send to server
+          socket.emit("send_canvas_action", data);
     }
     
   }
 }
 function mouseDragged() {
-    if (isDrawing && inCanvasBounds()) {
+    if (isDrawing && inDrawingArea()) {
         const data = {
             id: genActId(1),
             num: action_cnt+1,
@@ -665,7 +679,7 @@ function mouseReleased() {
         layer: current_layer,
         type: current_tool,
         num: action_cnt,
-        bake: false,
+        baked: false,
         undid: false,
         finalized: true,
     }
@@ -684,14 +698,22 @@ function mouseReleased() {
     img.loadPixels()
     action.pixels = img.pixels
 
-    // send w/o canvas element
-    socket.emit("send_finalized_action", action);
+    try {
+      // send w/o canvas element
+      socket.emit("send_finalized_action", action);
+    } catch (err) {
+      console.log(`ERROR! Probably too big, but here's the error msg: ${err}`)
+    }
 
     // now add canvas :)
     action.img = img
 
-    LAYERS[action.layer].stroke_history.push(action);
-    UNDO_STACK.push(action);
+    // add to queue
+    ACTION_QUEUE.push({
+      type: "ADD",
+      action: action
+    });
+    UNDO_STACK.push(action)
 
     LAYERS[action.layer].live.clear();
     LAYERS[action.layer].mask.background((255,255,255,255));
@@ -704,35 +726,43 @@ function mouseReleased() {
   }
 }
 
+function changeActiveTool(tool) {
+  current_tool = tool;
+  let tools = document.querySelectorAll('#tools button');
+  tools.forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.id == tool) {
+      btn.classList.add('active')
+    }
+  })
+  console.log(`tool is now ${current_tool}`)
+}
+
 function keyPressed() {
   if(inCanvasBounds()) {
     if (key === 'z' || key === 'Z') {
-      undo();
+      ACTION_QUEUE.push({type: "UNDO_LOCAL"})
+      console.log("pushed undo")
     }
     if (key === 'y' || key === 'Y') {
-      redo();
+      ACTION_QUEUE.push({type: "REDO_LOCAL"})
     }
     if (key === 'a') {
-      current_tool = 'pen'
-      console.log(`tool is ${current_tool}`)
+      changeActiveTool('pen')
     }
     if (key === 's') {
-      current_tool = 'pencil'
-      console.log(`tool is ${current_tool}`)
+      changeActiveTool('pencil')
     }
     if (key === 'g') {
-      current_tool = 'select'
-      console.log(`tool is ${current_tool}`)
+      changeActiveTool('select')
     }
     if (key === 'd' && current_tool != 'select') {
-      current_tool = 'eraser'
-      console.log(`tool is ${current_tool}`)
+      changeActiveTool('eraser')
     } else if (key === 'd'  && current_tool == 'select') {
       console.log('delete!')
     }
     if (key === 'f' && current_tool != 'select') {
-      current_tool = 'fill'
-      console.log(`tool is ${current_tool}`)
+      changeActiveTool('fill')
     } else if (key === 'f' && current_tool == 'select') {
       
     }
@@ -763,7 +793,11 @@ function keyPressed() {
     }
     if (key === ']') {
       // delete layer
-      deleteCurrentLayer(current_layer)
+      if (window.confirm(`Are you sure you want to delete layer ${current_layer}?`)) {
+        deleteCurrentLayer(current_layer)
+      } else {
+        console.log('cancel delete layer')
+      }
     }
     if (key === '[') {
       // create layer
@@ -804,11 +838,11 @@ function keyPressed() {
       OFFSET = calculateOffset()
     }
     if (key == LEFT_ARROW) {
-      ZOOM.pan_x += 10
+      ZOOM.pan_x -= 10
       OFFSET = calculateOffset()
     }
     if (key == RIGHT_ARROW) {
-      ZOOM.pan_x -= 10
+      ZOOM.pan_x += 10
       OFFSET = calculateOffset()
     }
   }
@@ -843,6 +877,7 @@ function sendChatMessage() {
 }
 
 function set_color(el){
+    document.querySelector("#art canvas").style.setProperty('--color', colorPicker.value());
     el.style.backgroundColor=colorPicker.value() + (alphaSlider.value() == 255 ? "" : parseInt(alphaSlider.value()).toString(16).padStart(2, "0"));
 }
 

@@ -9,6 +9,21 @@ function preview() {
 
 function saveSettings() {
     preview();
+
+    if (! (document.getElementById("user").value.length <= 20 && document.getElementById("user").value.length >= 1) ) {
+        alert("You must enter a valid username between 1 and 20 characters in length.")
+        document.getElementById("user").value = '';
+        document.getElementById("user").focus();
+        return;
+    }
+    // validate
+    if (!isColor(document.getElementById("ucolor").value)) {
+        alert("You must enter a valid color.")
+        document.getElementById("ucolor").value = '';
+        document.getElementById("ucolor").focus();
+        return;
+    }
+    alert("Settings saved.")
     localStorage.setItem('draw-username',document.getElementById("user").value);
     localStorage.setItem('draw-color',document.getElementById("ucolor").value);
 }
