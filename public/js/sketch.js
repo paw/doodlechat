@@ -61,7 +61,7 @@ function setup() {
     // https://github.com/processing/p5.js/wiki/
 
     CANVAS = createCanvas(windowHeight, windowHeight).pixelDensity(1);
-    frameRate(144); // frame rate cap
+    frameRate(60); // frame rate cap
     CANVAS.parent(document.querySelector("#art"));
     ACTIVE_AREA = createGraphics(cWidth,cHeight).pixelDensity(1);
     ACTION_LAYER = createGraphics(cWidth,cHeight).pixelDensity(1);
@@ -175,15 +175,10 @@ function setup() {
         document.querySelector("#chatwrap").scrollTop = document.querySelector("#chatwrap").scrollHeight;
 	})
 
-    // Getting our buttons and the holder through the p5.js dom
-    colorPicker = select('#color-picker');
-    alphaSlider = select('#alpha-picker');
-    colorPicker.value('#000');
-
-    document.querySelector("#art").setAttribute("style",`--ucolor: ${ucolor};--color: ${colorPicker.value()};`);
-    set_color(document.querySelector("#color-select")); // upodate visuals
-
-	const stroke_width_picker = select('#stroke-width-picker'),
+  // Getting our buttons and the holder through the p5.js dom
+  colorPicker = select('#color-picker');
+  alphaSlider = select('#alpha-picker');
+  const stroke_width_picker = select('#stroke-width-picker'),
         stroke_label = document.querySelector('#current_stroke_width'),
         layer_select = select('#layer_select'),
         pen_button = select('#pen'),
@@ -194,6 +189,13 @@ function setup() {
         undo_btn = select('#undo'),
         redo_btn = select('#redo'),
         clear_button = select('li[data-action="clear"]');
+
+    colorPicker.value('#000');
+    alphaSlider.value(255);
+    stroke_width_picker.value(4);
+
+    document.querySelector("#art").setAttribute("style",`--ucolor: ${ucolor};--color: ${colorPicker.value()};`);
+    set_color(document.querySelector("#color-select")); // upodate visuals
 
     undo_btn.mouseClicked(() => {
         ACTION_QUEUE.push({type: "UNDO_LOCAL"})
@@ -416,7 +418,7 @@ function canvasAction(data,local = false) {
     }
     
   } else if (data.tool == 'eraser') {
-        lineBresenham(LAYERS[data.layer].mask, data.px, data.py, data.x, data.y, data.size,[0,0,0,0]);
+        lineBresenham(LAYERS[data.layer].mask, data.px, data.py, data.x, data.y, data.size,[0,0,0,255 - data.alpha]);
     if (local) {
         //lineBresenham(LAYERS[data.layer].mask, data.px, data.py, data.x, data.y, data.size,[0,0,0,0]);
         boundingBoxEnd.x = max(boundingBoxEnd.x, data.x);
@@ -611,7 +613,7 @@ function mousePressed() {
   }
 }
 function mouseDragged() {
-    if (isDrawing && inDrawingArea()) {
+    if (isDrawing && inDrawingArea() && current_tool != 'fill') {
         const data = {
             id: genActId(1),
             num: action_cnt+1,

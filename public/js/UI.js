@@ -14,18 +14,13 @@ function drawUI() {
   UI_LAYER.clear();
   
 
-  if (current_tool == 'eraser') {
-    CANVAS.classList = 'p5Canvas eraser'
-  } else if (current_tool == 'eyedropper') {
-    CANVAS.classList = 'p5Canvas dropper'
-  } else{
-    CANVAS.classList = 'p5Canvas'
+  if (!(current_tool == 'eraser' || current_tool == 'eyedropper')) {
     push()
-    UI_LAYER.fill(colorPicker.value(),alphaSlider.value())
+    UI_LAYER.fill(red(colorPicker.value()),green(colorPicker.value()),blue(colorPicker.value()),alphaSlider.value())
     if(current_tool == 'pencil') {
-      UI_LAYER.square(parseInt(mouseX - strokeWidth / 2), parseInt(mouseY - strokeWidth / 2), strokeWidth);
+      UI_LAYER.square(parseInt(mouseX - strokeWidth / 2), parseInt(mouseY - strokeWidth / 2), strokeWidth * ZOOM.scale_factor);
     } else {
-      UI_LAYER.ellipse(parseInt(mouseX), parseInt(mouseY), strokeWidth, strokeWidth);
+      UI_LAYER.ellipse(parseInt(mouseX), parseInt(mouseY), strokeWidth * ZOOM.scale_factor, strokeWidth * ZOOM.scale_factor);
     }
     pop();
   }

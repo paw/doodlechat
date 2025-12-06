@@ -7,7 +7,6 @@ const PORT = process.env.PORT || 3000;
 var connections = [],
     userdata = [],
     layerstates = [],
-    global_midpoint_stack = [],
     global_actions_stack = [],
     global_chat_stack = [];
 
@@ -81,7 +80,6 @@ io.sockets.on('connection', (socket) => {
 
   socket.on('send_canvas_action', (data) => {
     socket.broadcast.emit('get_canvas_action', data);
-    global_midpoint_stack.push(data);
   });
   socket.on('send_finalized_action', (data) => {
     socket.broadcast.emit('get_finalized_action', data);
