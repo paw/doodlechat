@@ -5,6 +5,8 @@ function performAction(event) {
       //console.log(`layers before:`,LAYERS[event.action.layer].stroke_history)
       LAYERS[event.action.layer].stroke_history.push(event.action)
       console.log(`${event.action.id} pushed to ${event.action.layer}?`)
+      LAYERS[event.action.layer].live.clear();
+      LAYERS[event.action.layer].mask.background((255,255,255,255));
       //console.log(`layers after:`,LAYERS[event.action.layer].stroke_history)
       // check undo stack and mark some stuff as bakeable for later
       if (UNDO_STACK.length > MAX_UNDOS) {
@@ -29,7 +31,9 @@ function performAction(event) {
       break;
     }
     case "UNDO_REMOTE": {
-      receiveUndo(event.action)
+      receiveUndo(event.action);
+      LAYERS[event.action.layer].live.clear();
+      LAYERS[event.action.layer].mask.background((255,255,255,255));
       break;
     }
     case "REDO_LOCAL": {
@@ -38,6 +42,8 @@ function performAction(event) {
     }
     case "REDO_REMOTE": {
       receiveRedo(event.action)
+      LAYERS[event.action.layer].live.clear();
+      LAYERS[event.action.layer].mask.background((255,255,255,255));
       break;
     }
     case "MARK_BAKE": {
@@ -78,6 +84,9 @@ function performAction(event) {
     case "SORT": {
       break;
     }
+    default: {
+      console.warn(`Unknown dispatch type`)
+    }
   }
 
 }
@@ -96,7 +105,7 @@ function undo() {
     undid_action.undid = true;
     REDO_STACK.push(undid_action);
     console.log(`Undid Action #${actual_stroke_data.num}.`);
-    socket.emit("undo", undid_action.id)
+    socket.emit("undo", { id: undid_action.id, layer: undid_action.layer })
   } catch(err) {
     console.log(`UNDO ERROR: ${err}`)
   }
@@ -114,20 +123,30 @@ function redo() {
     redid_action.undid = false;
     UNDO_STACK.push(redid_action);
     console.log(`Redid Action #${actual_stroke_data.num}.`);
-    socket.emit("redo", redid_action.id)
+    socket.emit("redo", { id: redid_action.id, layer: redid_action.layer })
   } catch(err) {
-    console.log(`UNDO ERROR: ${err}`)
+    console.log(`REDO ERROR: ${err}`)
   }
 }
 function receiveUndo(data) {
-  let undo_me = LAYERS[data.layer].stroke_history.filter(action => { action.id === data.id })[0]
-  undo_me.undid = true;
-  console.log(`undo action ${undid.id} from ${undid.username}`)
+  try {
+    let undo_me = LAYERS[data.layer].stroke_history.filter(action => action.id === data.id )[0]
+    undo_me.undid = true;
+    console.log(`undo action ${undo_me.id} from ${undo_me.username}`)
+  } catch(err) {
+    console.warn("REMOTE UNDO ISSUE?",err)
+  }
+  LAYERS[data.layer].live.clear();
 }
 function receiveRedo(data) {
-  let redo_me = LAYERS[data.layer].stroke_history.filter(action => { action.id === data.id })[0]
-  redo_me.undid = false;
-  console.log(`redo action ${redid.id} from ${redid.username}`)
+  try {
+    let redo_me = LAYERS[data.layer].stroke_history.filter(action => action.id === data.id)[0]
+    redo_me.undid = false;
+    console.log(`redo action ${redo_me.id} from ${redo_me.username}`)
+  } catch (err) {
+    console.warn("REMOTE REDO ISSUE?",err)
+  }
+  LAYERS[data.layer].live.clear();
 }
 
 function createCheckerboard() {
@@ -158,7 +177,7 @@ function createCheckerboard() {
 }
 
 function redrawLayer(layer) {
-  let stuff = [...layer.stroke_history];
+  let stuff = layer.stroke_history;
   // make sure everything is drawn in order
   stuff.sort(function(x, y){ return x.timestamp - y.timestamp; });
 

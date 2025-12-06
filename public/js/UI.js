@@ -1,9 +1,13 @@
-function drawUsername(user,pos) {
-  textSize(32);
-  fill(255);
-  stroke(0);
-  strokeWeight(4);
-  text(user, 50, 50);
+
+const USER_LABELS = [];
+
+function drawUsername(username,usercolor,pos_x,pos_y) {
+  UI_LAYER.fill(usercolor);
+  UI_LAYER.stroke(0);
+  UI_LAYER.strokeWeight(4);
+  UI_LAYER.textAlign(LEFT);
+  
+  UI_LAYER.text(username, pos_x+5, pos_y-20);
 }
 
 function drawUI() {
@@ -26,12 +30,13 @@ function drawUI() {
     pop();
   }
   
-  UI_LAYER.fill(ucolor);
-  UI_LAYER.stroke(0);
-  UI_LAYER.strokeWeight(4);
-  UI_LAYER.textAlign(LEFT);
+  drawUsername(user,ucolor,parseInt(mouseX),parseInt(mouseY))
+
+  while (USER_LABELS.length > 0) {
+    let label = USER_LABELS.shift();
+    drawUsername(label.username,label.ucolor,parseInt((label.rawx - OFFSET.x) / ZOOM.scale_factor),parseInt((label.rawy - OFFSET.y) / ZOOM.scale_factor))
+  }
   
-  UI_LAYER.text(user, parseInt(mouseX)+5, parseInt(mouseY)-20);
   
   UI_LAYER.strokeWeight(0);
   UI_LAYER.fill(0);

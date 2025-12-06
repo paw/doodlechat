@@ -1,5 +1,4 @@
-const seenActions = new Set(),
-      ACTION_QUEUE = [];
+const ACTION_QUEUE = [];
 
 let user,
     current_tool = 'pen',
@@ -36,8 +35,8 @@ let user,
 
     action_cnt = 0,
 
-    cWidth = 700,
-    cHeight = 700,
+    cWidth = 500,
+    cHeight = 500,
     
     ucolor_index = 0;
 
@@ -62,7 +61,7 @@ function setup() {
     // https://github.com/processing/p5.js/wiki/
 
     CANVAS = createCanvas(windowHeight, windowHeight).pixelDensity(1);
-    frameRate(60); // frame rate cap
+    frameRate(144); // frame rate cap
     CANVAS.parent(document.querySelector("#art"));
     ACTIVE_AREA = createGraphics(cWidth,cHeight).pixelDensity(1);
     ACTION_LAYER = createGraphics(cWidth,cHeight).pixelDensity(1);
@@ -127,9 +126,6 @@ function setup() {
     // Callback functions
 	socket.on("get_canvas_action", data => {
         if (!data || !data.id) return;
-        if (seenActions.has(data.id)) return; // ignore our own strokes
-        seenActions.add(data.id);
-
         // Apply remote partial stroke, not live if we're actively drawing on same layer to prevent a race condition
         if (data.layer != current_layer && !isDrawing) {
           canvasAction(data, false);
@@ -139,8 +135,6 @@ function setup() {
 
     socket.on("get_finalized_action", data => {
         if (!data || !data.id) return;
-        if (seenActions.has(data.id)) return;
-        seenActions.add(data.id);
         console.log(`Final stroke received from ${data.username}`);
         // recreate image?
         data.img = createSpriteFromPixelsArray(data)
@@ -152,11 +146,11 @@ function setup() {
     });
 
   socket.on("get_undo", data => {
-    ACTION_QUEUE.push({type: "REMOTE_UNDO", action: data})
+    ACTION_QUEUE.push({type: "UNDO_REMOTE", action: data})
   });
 
   socket.on("get_redo", data => {
-    ACTION_QUEUE.push({type: "REMOTE_REDO", action: data})
+    ACTION_QUEUE.push({type: "REDO_REMOTE", action: data})
   });
 
 	socket.on('get_canvas_progress', data => {
@@ -178,6 +172,7 @@ function setup() {
     socket.on('receive_chat_message', data => {
         console.log(`${data.username} has sent a message: ${data.message}`);
         document.querySelector("#chatwrap ul").append(chatLine(`${data.username}:`, data.color, ` ${data.message}`));
+        document.querySelector("#chatwrap").scrollTop = document.querySelector("#chatwrap").scrollHeight;
 	})
 
     // Getting our buttons and the holder through the p5.js dom
@@ -201,10 +196,10 @@ function setup() {
         clear_button = select('li[data-action="clear"]');
 
     undo_btn.mouseClicked(() => {
-        undo()
+        ACTION_QUEUE.push({type: "UNDO_LOCAL"})
     });
     redo_btn.mouseClicked(() => {
-        redo()
+        ACTION_QUEUE.push({type: "REDO_LOCAL"})
     });
 
     LAYERS.forEach((layer, index) => {
@@ -221,21 +216,19 @@ function setup() {
     })
 
     eraser_button.mouseClicked(() => {
-        current_tool = 'eraser';
-        console.log(`changed tool: ${current_tool}`);
+        changeActiveTool('eraser')
     })
-
+    fill_button.mouseClicked(() => {
+        changeActiveTool('fill')
+    })
     pen_button.mouseClicked(() => {
-        current_tool = 'pen';
-        console.log(`changed tool: ${current_tool}`);
+        changeActiveTool('pen')
     })
     pencil_button.mouseClicked(() => {
-        current_tool = 'pencil';
-        console.log(`changed tool: ${current_tool}`);
+        changeActiveTool('pencil')
     })
     eyedropper_button.mouseClicked(() => {
-        current_tool = 'eyedropper';
-        console.log(`changed tool: ${current_tool}`);
+        changeActiveTool('eyedropper')
     })
     clear_button.mouseClicked(() => {
         console.log(`clear layer: ${current_layer}`);
@@ -255,6 +248,9 @@ function setup() {
             sendChatMessage();
         }
     });
+
+    // set default tool
+    changeActiveTool('pen')
 
 	// Adding a mousePressed listener to the button
 	
@@ -420,10 +416,9 @@ function canvasAction(data,local = false) {
     }
     
   } else if (data.tool == 'eraser') {
-    
         lineBresenham(LAYERS[data.layer].mask, data.px, data.py, data.x, data.y, data.size,[0,0,0,0]);
-    
     if (local) {
+        //lineBresenham(LAYERS[data.layer].mask, data.px, data.py, data.x, data.y, data.size,[0,0,0,0]);
         boundingBoxEnd.x = max(boundingBoxEnd.x, data.x);
         boundingBoxEnd.y = max(boundingBoxEnd.y, data.y);
         boundingBoxStart.x = min(boundingBoxStart.x, data.x);
@@ -433,8 +428,8 @@ function canvasAction(data,local = false) {
   } else if (data.tool == 'fill') {
     if (local) {
         floodScanFill(LAYERS[data.layer],ACTION_LAYER,data.x,data.y,[red(data.color),green(data.color),blue(data.color),data.alpha]);
-        boundingBoxEnd.x = LAYERS[current_layer].width;
-        boundingBoxEnd.y = LAYERS[current_layer].height;
+        boundingBoxEnd.x = LAYERS[data.layer].width;
+        boundingBoxEnd.y = LAYERS[data.layer].height;
         boundingBoxStart.x = 0;
         boundingBoxStart.y = 0;
     }
@@ -443,12 +438,12 @@ function canvasAction(data,local = false) {
     rectSelect(UI_LAYER,LAYERS[current_layer])
   }
   if (!local) {
-    UI_LAYER.fill(data.ucolor);
-    UI_LAYER.stroke(0);
-    UI_LAYER.strokeWeight(4);
-    UI_LAYER.textAlign(LEFT);
-    UI_LAYER.text(data.username, parseInt(data.mouseX)+5, parseInt(data.mouseY)-20);
+    USER_LABELS.push({username: data.username, ucolor: data.ucolor, x: data.x, y: data.y})
   }
+}
+
+function p5ImageToBase64(img) {
+  return img.canvas.toDataURL("image/png");
 }
 
 function createSpriteFromPixelsArray(data) {
@@ -456,8 +451,8 @@ function createSpriteFromPixelsArray(data) {
     img.loadPixels()
     const src = new Uint8Array(data.pixels);
     //const src = [...typedArray];
-    for (let y = 0; y <= data.height; y++) {
-        for (let x = 0; x <= data.width; x++) {
+    for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
             let index = (x + y * data.width) * 4;
             img.pixels[index + 0] = src[index + 0]
             img.pixels[index + 1] = src[index + 1]
@@ -468,6 +463,7 @@ function createSpriteFromPixelsArray(data) {
     img.updatePixels()
     return img;
 }
+
 
 function deleteCurrentLayer(current) {
   
@@ -591,6 +587,10 @@ function mousePressed() {
               y: parseInt((mouseY - OFFSET.y) / ZOOM.scale_factor),
               px: parseInt((pmouseX - OFFSET.x) / ZOOM.scale_factor),
               py: parseInt((pmouseY - OFFSET.y) / ZOOM.scale_factor),
+              rawx: mouseX - OFFSET.x,
+              rawy: mouseY - OFFSET.y,
+              rawpx: pmouseX - OFFSET.x,
+              rawpy: pmouseY - OFFSET.y,
               size: strokeWidth,
               color: colorPicker.value(),
               alpha: alphaSlider.value(),
@@ -600,9 +600,6 @@ function mousePressed() {
               timestamp: Date.now(),
               finalized: false
           };
-
-          // mark so echoed version doesn't get applied
-          seenActions.add(data.id);
 
           // apply locally
           canvasAction(data, true);
@@ -623,6 +620,10 @@ function mouseDragged() {
             y: parseInt((mouseY - OFFSET.y) / ZOOM.scale_factor),
             px: parseInt((pmouseX - OFFSET.x) / ZOOM.scale_factor),
             py: parseInt((pmouseY - OFFSET.y) / ZOOM.scale_factor),
+            rawx: mouseX - OFFSET.x,
+            rawy: mouseY - OFFSET.y,
+            rawpx: pmouseX - OFFSET.x,
+            rawpy: pmouseY - OFFSET.y,
             size: strokeWidth,
             color: colorPicker.value(),
             alpha: alphaSlider.value(),
@@ -631,9 +632,6 @@ function mouseDragged() {
             timestamp: Date.now(),
             finalized: false
         };
-
-        // mark so echoed version doesn't get applied
-        seenActions.add(data.id);
 
         // apply locally
         canvasAction(data, true);
@@ -685,12 +683,16 @@ function mouseReleased() {
     }
 
     if (action.type == 'eraser') {
-      img = getStroke(LAYERS[action.layer].mask,0,0,cWidth,cHeight)
+      img = getStroke(LAYERS[action.layer].mask,0,0,LAYERS[action.layer].mask.width,LAYERS[action.layer].mask.height)
+      action.x = 0;
+      action.y = 0;
+      action.width = LAYERS[action.layer].mask.width;
+      action.height = LAYERS[action.layer].mask.height;
     } else if (action.type == 'fill') {
       action.x = 0;
       action.y = 0;
-      action.width = cWidth;
-      action.height = cHeight;
+      action.width = LAYERS[action.layer].mask.width;
+      action.height = LAYERS[action.layer].mask.height;
       img = getStroke(ACTION_LAYER, action.x, action.y, action.width, action.height)
     } else {
       img = getStroke(ACTION_LAYER, x, y, w, h)
@@ -720,7 +722,6 @@ function mouseReleased() {
     ACTION_LAYER.clear()
 
     console.log(action)
-    seenActions.add(action.id);
 
     console.log(`Stroke #${action.num} type: ${action.type} on layer #${action.layer} at ${action.timestamp}`);
   }
@@ -735,11 +736,12 @@ function changeActiveTool(tool) {
       btn.classList.add('active')
     }
   })
+  document.querySelector("#art canvas").classList = `p5Canvas ${current_tool}`;
   console.log(`tool is now ${current_tool}`)
 }
 
 function keyPressed() {
-  if(inCanvasBounds()) {
+  if(inCanvasBounds() && document.activeElement.id == "paint") {
     if (key === 'z' || key === 'Z') {
       ACTION_QUEUE.push({type: "UNDO_LOCAL"})
       console.log("pushed undo")
@@ -753,9 +755,9 @@ function keyPressed() {
     if (key === 's') {
       changeActiveTool('pencil')
     }
-    if (key === 'g') {
+    /*if (key === 'g') {
       changeActiveTool('select')
-    }
+    }*/
     if (key === 'd' && current_tool != 'select') {
       changeActiveTool('eraser')
     } else if (key === 'd'  && current_tool == 'select') {
@@ -870,6 +872,7 @@ function sendChatMessage() {
         message.value = '';
         message.focus();
         console.log("sent chat message");
+        document.querySelector("#chatwrap").scrollTop = document.querySelector("#chatwrap").scrollHeight;
     } else {
         console.log("no message no sending.");
         message.focus();

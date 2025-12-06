@@ -89,11 +89,11 @@ io.sockets.on('connection', (socket) => {
   });
   socket.on('undo', (data) => {
     socket.broadcast.emit('get_undo', data);
-    global_actions_stack.filter(ele => {ele.id == data.id}).undid = true;
+    //global_actions_stack.filter(ele => {ele.id == data.id})[0].undid = true;
   });
   socket.on('redo', (data) => {
     socket.broadcast.emit('get_redo', data);
-    global_actions_stack.filter(ele => {ele.id == data.id}).undid = false;
+    //global_actions_stack.filter(ele => {ele.id == data.id})[0].undid = false;
   });
 
   socket.on('send_chat_message', (data) => {
