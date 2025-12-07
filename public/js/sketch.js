@@ -1,9 +1,9 @@
 const ACTION_QUEUE = [];
 
-let user,
+let user, ucolor,
     current_tool = 'pen',
     current_layer = 0,
-    isDrawing = false,
+    IS_DRAWING = false,
     boundingBoxStart,
     boundingBoxEnd,
     strokeWidth = 4,
@@ -11,11 +11,15 @@ let user,
     selectionStart = {x: 0, y: 0},
     selectionEnd = {x: 0, y: 0},
 
-    ucolor = "black",
-    my_colors = ['red','yellow','orange','cyan','blue','magenta','pink','purple','black','grey','white','sienna','green','lime'],
-    ualpha = 255, //TODO make this work with transparency, it just isn't working right
+    HOST = false,
+    ADMIN = false,
 
-    /*IMPORTANT VARS*/
+    PANNING = false,
+    PAN = {x: 0, y: 0},
+    ZOOMING = false,
+    ZOOM_MULTIPLIER = 1.0,
+    SELECTING = false,
+
     barHeight = 100,
     LAYERS = [],
     CANVAS,
@@ -31,6 +35,7 @@ let user,
     OFFSET,
     MAX_UNDOS = 5,
     BAKE_UNDOS = 3,
+    CONNECTIONS = [],
 
 
     action_cnt = 0,
@@ -47,7 +52,7 @@ function setup() {
             isReload = navType === 'reload',
             isBackForward = navType === 'back_forward';
             
-    /*if (user == null) {
+    if (user == null) {
         window.location.replace("/settings");
     }/* else if (isReload || isBackForward) {
         window.location.replace("/");
@@ -77,6 +82,8 @@ function setup() {
         mask: createGraphics(cWidth,cHeight).pixelDensity(1),
         baked : createImage(cWidth, cHeight).pixelDensity(1),
         removed : false,
+        hidden: false,
+        history_start: 0,
         stroke_history: []
         };
         lyr.mask.background(255,255,255,255) 
@@ -98,38 +105,74 @@ function setup() {
     socket.on('initial_connection', data => {
         socket.emit("new_connection", {
             username: user,
-            color: ucolor
+            color: ucolor,
+            current_layer: 0,
         });
     });
     socket.on('disconnect', data => {
       console.log("DISCONNECTED SOCKET")
-        window.location.replace("/");
+      window.location.replace("/");
+    });
+
+    socket.on('make_host', data => {
+      // admin actions are verified on server so even if this is set by js nothing will happen.
+      HOST = true;
+      ADMIN = true;
+      document.querySelectorAll(`[data-type="admin"]`).forEach(ele => {
+        ele.classList.remove("disabled")
+      })
+      console.log("You are now host.")
+    });
+
+    socket.on('kick', data => {
+      window.location.replace("/?kicked=true");
     });
 
     // retrieve current global state and render to canvas layers here
     // TODO
+    // emit rq
 
     //
 	socket.on('list_current_users', data => {
         document.querySelector("#users").innerHTML = '';
         current_connection_cnt = data.length;
+    CONNECTIONS = data;
 		data.forEach(user => {
             let block = document.createElement("div");
             block.innerText = user.username;
             block.id = user.socket_id;
             block.style.color = user.color;
-            block.class="user";
+            block.classList ="user";
+            if (user.host) {
+              block.classList.add("host");
+              block.innerHTML += `<i class="fa-sharp-duotone fa-regular fa-crown" title="Host"></i>`
+            } else if (user.admin) {
+              block.classList.add("admin");
+              block.innerHTML += `<i class="fa-sharp-duotone fa-regular fa-chess-knight-piece" title="Admin"></i>`
+            }
+            if(HOST && user.socket_id != socket.id) {
+              // add host controls
+              if (!user.admin) {
+                block.innerHTML += `<button class="btn" onclick="promote('${user.socket_id}')">Promote</button>`
+              } else {
+                block.innerHTML += `<button class="btn" onclick="demote('${user.socket_id}')">Demote</button>`
+              }
+            }
+            if ((HOST || ADMIN) && user.socket_id != socket.id && !(user.host || user.admin)) {
+              block.innerHTML += `<button class="btn" onclick="kick('${user.socket_id}')">Kick</button>`
+            } 
             document.querySelector("#users").append(block);
         })
 	})
+  
 
     // Callback functions
 	socket.on("get_canvas_action", data => {
         if (!data || !data.id) return;
-        // Apply remote partial stroke, not live if we're actively drawing on same layer to prevent a race condition
-        if (data.layer != current_layer && !isDrawing) {
+        // Apply remote partial stroke, not live if we're actively drawing on same layer to prevent weirdness
+        //if (data.layer != current_layer && !isDrawing) {
           canvasAction(data, false);
-        }
+        //}
     });
 
 
@@ -153,11 +196,39 @@ function setup() {
     ACTION_QUEUE.push({type: "REDO_REMOTE", action: data})
   });
 
+  socket.on("update_connections", data => {
+    CONNECTIONS.find(ele => ele.socket_id == data.socket_id).current_layer = data.current_layer
+  });
+
 	socket.on('get_canvas_progress', data => {
-        console.log("loaded active canvas");
+    document.querySelector("#loading").classList.remove("hide");
+    // right now just sending & receiving entire action stack from server, eventually will implement getting canvas progress up to a certain point
+        data.forEach(action => {
+          console.log(action)
+          if (action.pixels != undefined)
+            {
+              action.img = createSpriteFromPixelsArray(action)
+            }
+          ACTION_QUEUE.push({
+            type: "ADD",
+            action: action
+          });
+        })
+      document.querySelector("#loading").classList.add("hide");
+        console.log(`got current canvas info`)
 	});
     socket.on('get_chat_history', data => {
         console.log("loaded active canvas");
+	});
+
+  socket.on('confirm_delete_layer', data => {
+      deleteCurrentLayer(data.layer)
+      console.log(`admin ${data.username} deleted layer ${data.layer}`)
+	});
+
+  socket.on('confirm_add_layer', data => {
+      createNewLayer()
+      console.log(`admin ${data.username} created new layer`)
 	});
 
     // when disconnect we will remove them
@@ -174,6 +245,27 @@ function setup() {
         document.querySelector("#chatwrap ul").append(chatLine(`${data.username}:`, data.color, ` ${data.message}`));
         document.querySelector("#chatwrap").scrollTop = document.querySelector("#chatwrap").scrollHeight;
 	})
+  socket.on('receive_server_message', data => {
+        console.log(`SERVER has sent a message: ${data.message}`);
+        document.querySelector("#chatwrap ul").append(chatLine(`${data.username}`, data.color, ` ${data.message}`,true));
+        document.querySelector("#chatwrap").scrollTop = document.querySelector("#chatwrap").scrollHeight;
+	})
+    socket.on('promote', data => {
+        console.log(`You have been promoted.`);
+        ADMIN = true;
+        document.querySelectorAll(`[data-type="admin"]`).forEach(ele => {
+          ele.classList.remove("disabled")
+        })
+        //document.querySelector("#chatwrap ul").append(chatLine(data.username, data.color, ' has been promoted.'));
+	})
+  socket.on('demote', data => {
+        console.log(`You have been demoted.`);
+        ADMIN = false;
+        document.querySelectorAll(`[data-type="admin"]`).forEach(ele => {
+          ele.classList.add("disabled")
+        })
+        //document.querySelector("#chatwrap ul").append(chatLine(data.username, data.color, ' has been promoted.'));
+	})
 
   // Getting our buttons and the holder through the p5.js dom
   colorPicker = select('#color-picker');
@@ -188,7 +280,12 @@ function setup() {
         eyedropper_button = select('#eyedropper'),
         undo_btn = select('#undo'),
         redo_btn = select('#redo'),
-        clear_button = select('li[data-action="clear"]');
+        zoom_btn = select('#zoom'),
+        clear_button = select('li[data-action="clear"]'),
+        exit = select("#exit"),
+        chat = document.querySelector("#chat"),
+        navbar = document.querySelector(".navbar"),
+        tools = document.querySelector("#controls");
 
     colorPicker.value('#000');
     alphaSlider.value(255);
@@ -204,18 +301,26 @@ function setup() {
         ACTION_QUEUE.push({type: "REDO_LOCAL"})
     });
 
-    LAYERS.forEach((layer, index) => {
-        let option = document.createElement('option');
-        option.value = index;
-        option.innerText = `Layer ${index}`;
-        document.querySelector("#layer_select").append(option)
+    exit.mouseClicked(() => {
+        if (window.confirm("Leave Room?")) {
+          window.location.replace("/")
+        }
+    });
+
+    [chat,navbar,tools].forEach(element => {
+      element.addEventListener("mouseover", (event) => {
+        document.body.classList.add("modal-open")
+      })
+      element.addEventListener("mouseout", (event) => {
+        document.body.classList.remove("modal-open")
+      })
     })
 
-    document.querySelector("#layer_select").addEventListener("change", function() {
+    /*document.querySelector("#layer_select").addEventListener("change", function() {
         let val = layer_select.value();
         current_layer = val;
         console.log(`layer is now ${current_layer}`)
-    })
+    })*/
 
     eraser_button.mouseClicked(() => {
         changeActiveTool('eraser')
@@ -232,14 +337,56 @@ function setup() {
     eyedropper_button.mouseClicked(() => {
         changeActiveTool('eyedropper')
     })
+    zoom_btn.mouseClicked(() => {
+        changeActiveTool('zoom')
+    })
     clear_button.mouseClicked(() => {
         console.log(`clear layer: ${current_layer}`);
         LAYERS[current_layer].clear();
         socket.emit('clear_canvas',{layer: current_layer})
     })
     document.querySelector(`[data-action="new-layer"]`).addEventListener("click", (event) => {
-        createNewLayer()
-        alert(`added layer`)
+        if (ADMIN || HOST) {
+          if (window.confirm(`Are you sure you want to add a new layer?`)) {
+            request_add_layer()
+            event.target.parentNode.classList.remove("show");
+          }
+        }
+    })
+    document.querySelector(`[data-action="delete-layer"]`).addEventListener("click", (event) => {
+        if (ADMIN || HOST) {
+          if (window.confirm(`Are you sure you want to delete layer #${current_layer+1}?`)) {
+            request_delete_layer(current_layer)
+            event.target.parentNode.classList.remove("show");
+          }
+        }
+    })
+    
+    document.querySelector(`[data-action="show-layers"]`).addEventListener("click", (event) => {
+      event.target.parentNode.classList.remove("show");
+      document.body.classList.add("modal-open")
+        let modal = document.querySelector("#layers"),
+            list = modal.querySelector("#list"),
+            temp = modal.querySelector(`[data-name="template"]`);
+        modal.classList.remove("hide");
+        list.innerHTML = '';
+        LAYERS.forEach((layer,index) => {
+          let li = temp.cloneNode(true);
+          li.classList.remove('hide');
+          let ulist = CONNECTIONS.filter(ele => ele.current_layer == index);
+          ulist.forEach(user => {
+            li.querySelector(`[data-name="users"]`).innerHTML += `<span style="color:${user.color}>${user.username}</span>, `
+          })
+          li.querySelector('[data-name="number"]').innerText = index+1;
+          li.querySelector("button").addEventListener("click", function() {
+            current_layer = index;
+            socket.emit("layer_change",{ new_layer: current_layer})
+            modal.classList.add('hide');
+            document.querySelector("#art canvas").focus();
+            document.body.classList.remove("modal-open")
+          });
+          list.append(li)
+        })
     })
 
     document.querySelector("#chatsend").addEventListener("click", (event) => {
@@ -264,6 +411,36 @@ function setup() {
         }
         else console.log("something wrong with picker")
     });
+}
+
+function kick(socket_id) {
+  socket.emit('initiate_kick',{target: socket_id})
+}
+
+function promote(socket_id) {
+  socket.emit('admin_promote',{target: socket_id})
+}
+
+function demote(socket_id) {
+  socket.emit('admin_demote',{target: socket_id})
+}
+
+function request_add_layer() {
+  if (LAYERS.length == MAX_LAYERS) {
+    alert("sorry, too many layers!");
+    console.log("hit max layer count");
+    return;
+  }
+  socket.emit('request_add_layer')
+}
+
+function request_delete_layer(layer) {
+  if (LAYERS.length == 1) {
+    alert("you must have at least 1 layer");
+    console.log("need at least one layer");
+    return;
+  }
+  socket.emit('request_delete_layer',{layer: layer})
 }
 
 function windowResized() {
@@ -307,6 +484,21 @@ function draw() {
   while (ACTION_QUEUE.length > 0) {
     let act = ACTION_QUEUE.shift();
     performAction(act)
+  }
+
+  if (ZOOMING) {
+    ZOOM.scale_factor *= ZOOM_MULTIPLIER
+    if (ZOOM.scale_factor <= 0.5) {
+      ZOOM.scale_factor = 0.5
+    } else if (ZOOM.scale_factor >= 5) {
+      ZOOM.scale_factor = 5
+    }
+    OFFSET = calculateOffset()
+  }
+  if (PANNING) {
+    ZOOM.pan_x += PAN.x
+    ZOOM.pan_y += PAN.y
+    OFFSET = calculateOffset()
   }
   
   ACTIVE_AREA.image(CHECKERBOARD,0,0)
@@ -399,9 +591,6 @@ function canvasAction(data,local = false) {
         boundingBoxStart.y = min(boundingBoxStart.y, data.y);
     }
     
-    
-
-    
   } else if (data.tool == 'pencil') {
 
     lineBresenham(LAYERS[data.layer].live, data.px, data.py, data.x, data.y, data.size, [red(data.color),green(data.color),blue(data.color),data.alpha]);
@@ -440,12 +629,8 @@ function canvasAction(data,local = false) {
     rectSelect(UI_LAYER,LAYERS[current_layer])
   }
   if (!local) {
-    USER_LABELS.push({username: data.username, ucolor: data.ucolor, x: data.x, y: data.y})
+    USER_LABELS.push({username: data.username, ucolor: data.ucolor, x: data.rawx, y: data.rawy})
   }
-}
-
-function p5ImageToBase64(img) {
-  return img.canvas.toDataURL("image/png");
 }
 
 function createSpriteFromPixelsArray(data) {
@@ -469,17 +654,21 @@ function createSpriteFromPixelsArray(data) {
 
 function deleteCurrentLayer(current) {
   
-  console.log(LAYERS)
+  //console.log(LAYERS)
   if (LAYERS.length == 1) { console.log("need at least one layer"); return; }
+  
   let deadlayer = LAYERS[current];
-  LAYERS.splice(LAYERS[current],1);
+  console.log(LAYERS[current],LAYERS)
+  let index = LAYERS.indexOf(deadlayer)
+  LAYERS.splice(index,1)
+  console.log("REMOVED",LAYERS)
   deadlayer.live.remove();
   deadlayer.mask.remove();
   delete deadlayer.baked;
   delete deadlayer.stroke_history;
   deadlayer.removed = true;
   // remove any actions assigned to this layer index from the undo stack
-  UNDO_STACK = UNDO_STACK.filter(function(action){return action.layer !== current});
+  UNDO_STACK = UNDO_STACK.filter(function(action){return action.layer != current});
   // shift user to nearest layer
   current_layer = (current-1 < 0 ) ? 0 : current-1;
   /*push delete layer into a global redo/undo stack?*/
@@ -487,14 +676,15 @@ function deleteCurrentLayer(current) {
 
 function createNewLayer() {
   if (LAYERS.length+1 > MAX_LAYERS) { console.log("you hit the max, sorry!"); return; }
-    let CANVAS = document.getElementById("defaultCanvas0")
     // push empty layer
     try {
       let lyr = {
         live : createGraphics(cWidth,cHeight).pixelDensity(1),
         mask: createGraphics(cWidth,cHeight).pixelDensity(1), // https://p5js.org/reference/p5/clip/
         baked : createImage(cWidth, cHeight).pixelDensity(1), //createGraphics(cWidth,cHeight).pixelDensity(1),
-
+        removed: false,
+        hidden: false,
+        history_start: 0,
         stroke_history: []
       };
       lyr.mask.background(255,255,255,255)
@@ -561,13 +751,12 @@ function changeDrawingAreaSize(x, y) {
 
 function genActId(cnt = 0) {
     return (
-        `${user}-${
-        Date.now().toString(36)}-${action_cnt+cnt}`
+        `${user}-${Date.now().toString(36)}-${action_cnt+cnt}`
     );
 }
 
 function mousePressed() {
-  if (mouseButton.left && inDrawingArea()) {
+  if (mouseButton.left && inDrawingArea() && !document.body.classList.contains("modal-open")) {
     if (current_tool == 'eyedropper') {
       var selected_pixel = color(redrawLayer(LAYERS[current_layer]).get((mouseX - OFFSET.x) / ZOOM.scale_factor,(mouseY - OFFSET.y) / ZOOM.scale_factor));
         //console.log(selected_pixel);
@@ -576,8 +765,11 @@ function mousePressed() {
             alphaSlider.value(255);
             set_color(document.querySelector("#color-select")); //update color picker
         }
+    } else if (current_tool == 'zoom') {
+        ZOOMING = true;
+        ZOOM_MULTIPLIER = 1.05;
     } else {
-      isDrawing = true;
+      IS_DRAWING = true;
       REDO_STACK = [];
       boundingBoxStart = {x: mouseX, y: mouseY};
       boundingBoxEnd = {x: mouseX, y: mouseY};
@@ -610,10 +802,15 @@ function mousePressed() {
           socket.emit("send_canvas_action", data);
     }
     
+  } else if (mouseButton.right && inDrawingArea() && !document.body.classList.contains("modal-open")) {
+    if (current_tool == 'zoom') {
+      ZOOMING = true;
+      ZOOM_MULTIPLIER = 0.95;
+    }
   }
 }
 function mouseDragged() {
-    if (isDrawing && inDrawingArea() && current_tool != 'fill') {
+    if (IS_DRAWING && inDrawingArea() && current_tool != 'fill' && document.activeElement.id == "paint" && !document.body.classList.contains("modal-open")) {
         const data = {
             id: genActId(1),
             num: action_cnt+1,
@@ -628,6 +825,7 @@ function mouseDragged() {
             rawpy: pmouseY - OFFSET.y,
             size: strokeWidth,
             color: colorPicker.value(),
+            ucolor: ucolor,
             alpha: alphaSlider.value(),
             layer: current_layer,
             username: user,
@@ -644,10 +842,10 @@ function mouseDragged() {
 }
 
 function mouseReleased() {
-  if (isDrawing) {
+  if (IS_DRAWING) {
     // finalize action to send to undo stack here
     
-    isDrawing = false;
+    IS_DRAWING = false;
     action_cnt++;
 
     let action, img, x, y, w, h,
@@ -727,6 +925,7 @@ function mouseReleased() {
 
     console.log(`Stroke #${action.num} type: ${action.type} on layer #${action.layer} at ${action.timestamp}`);
   }
+  ZOOMING = false;
 }
 
 function changeActiveTool(tool) {
@@ -751,69 +950,30 @@ function keyPressed() {
     if (key === 'y' || key === 'Y') {
       ACTION_QUEUE.push({type: "REDO_LOCAL"})
     }
-    if (key === 'a') {
+    if (key === 'a' || key === 'A') {
       changeActiveTool('pen')
     }
-    if (key === 's') {
+    if (key === 's' || key === 'S') {
       changeActiveTool('pencil')
     }
-    /*if (key === 'g') {
-      changeActiveTool('select')
-    }*/
-    if (key === 'd' && current_tool != 'select') {
+    if (key === 'd' || key === 'D') {
       changeActiveTool('eraser')
-    } else if (key === 'd'  && current_tool == 'select') {
-      console.log('delete!')
     }
-    if (key === 'f' && current_tool != 'select') {
+    if (key === 'f' || key === 'F') {
       changeActiveTool('fill')
-    } else if (key === 'f' && current_tool == 'select') {
-      
     }
-    if (key === '1' && current_layer > 0) {
-      current_layer--;
-      console.log(`now on layer #${current_layer}`)
+    if (key === 'r' || key === 'R') {
+      changeActiveTool('zoom')
     }
-    if (key === '2' && current_layer < LAYERS.length-1) {
-      current_layer++;
-      console.log(`now on layer #${current_layer}`) }
-    if (key === 'e' && strokeWidth < 100) {
-      strokeWidth += 2;
-      console.log(`size now ${strokeWidth}`)
-    }
-    if (key === 'q' && strokeWidth > 2) {
-      strokeWidth -= 2;
-      console.log(`size now ${strokeWidth}`)
-    }
-    if (key === '3') {
-      ucolor_index = (ucolor_index-1 < 0) ? my_colors.length-1 : ucolor_index-1;
-      ucolor = my_colors[ucolor_index]
-      console.log(`color now ${ucolor}`)
-    }
-    if (key === '4') {
-      ucolor_index = (ucolor_index+1 > my_colors.length) ? 0 : ucolor_index+1;
-      ucolor = my_colors[ucolor_index]
-      console.log(`color now ${ucolor}`)
-    }
-    if (key === ']') {
-      // delete layer
-      if (window.confirm(`Are you sure you want to delete layer ${current_layer}?`)) {
-        deleteCurrentLayer(current_layer)
-      } else {
-        console.log('cancel delete layer')
+    if (key === 'w' || key === 'W') {
+      if (current_tool == 'zoom') {
+        
+      } else if (strokeWidth < 100) {
+        strokeWidth += 2;
       }
     }
-    if (key === '[') {
-      // create layer
-      createNewLayer()
-    }
-    if (key === "'") {
-      // create layer
-      saveFlatCanvas()
-    }
-    if (key === ';') {
-      // create layer
-      saveOneLayer(LAYERS[current_layer])
+    if (key === 'q' || key === 'Q' && strokeWidth > 2) {
+      strokeWidth -= 2;
     }
     if (key === " ") {
       // create layer
@@ -823,38 +983,39 @@ function keyPressed() {
       ZOOM.pan_y = 0
       OFFSET = calculateOffset()
     }
-    if (key == '7') {
-      cWidth += 200;
-      cHeight += 200;
-      changeDrawingAreaSize(cWidth,cHeight)
-    }
-    if (key == '6') {
-      cWidth -= 200;
-      cHeight -= 200;
-      changeDrawingAreaSize(cWidth,cHeight)
-    }
     if (key == UP_ARROW) {
-      ZOOM.pan_y += 10
-      OFFSET = calculateOffset()
+      PANNING = true;
+      PAN.y = -10
     }
     if (key == DOWN_ARROW) {
-      ZOOM.pan_y -= 10
-      OFFSET = calculateOffset()
+      PAN.y = 10
+      PANNING = true;
     }
     if (key == LEFT_ARROW) {
-      ZOOM.pan_x -= 10
-      OFFSET = calculateOffset()
+      PANNING = true;
+      PAN.x = 10
     }
     if (key == RIGHT_ARROW) {
-      ZOOM.pan_x += 10
-      OFFSET = calculateOffset()
+      PANNING = true;
+      PAN.x = -10
     }
   }
 }
 
-function chatLine(name, color, message) {
+function keyReleased() {
+  if (key === RIGHT_ARROW || key == LEFT_ARROW || key == DOWN_ARROW || key == UP_ARROW ) {
+    // Code to run.
+    PANNING = false;
+    PAN = {x: 0, y: 0}
+  }
+}
+
+function chatLine(name, color, message, server = false) {
     let line = document.createElement("li");
-    line.innerHTML = `<span class="name"></span><span class="message"></span>`;
+    if (server) {
+      line.innerHTML = `<b>[SERVER]</b> `
+    }
+    line.innerHTML += `<span class="name"></span><span class="message"></span>`;
     line.querySelector(".name").style = `color: ${color}`;
     line.querySelector(".name").innerText = name;
     line.querySelector(".message").innerText = message;
@@ -865,6 +1026,7 @@ function sendChatMessage() {
     let message = document.querySelector("#chatmsg");
     if (message.value.length > 0) {
         let data = {
+            type: 'normal',
             username: user,
             color: ucolor,
             message: message.value

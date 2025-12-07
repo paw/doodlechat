@@ -12,6 +12,12 @@ function ready() {
             console.log(option.getAttribute("data-action"));
         });
     })
+    let params = new URLSearchParams(document.location.search);
+    let kicked = params.get("kicked");
+    if (kicked != null) {
+      alert('You have been kicked. Sorry!');
+      window.location.replace("/")
+    }
 
     /*// layer creation
     */

@@ -2,19 +2,20 @@
 const USER_LABELS = [];
 
 function drawUsername(username,usercolor,pos_x,pos_y) {
-  UI_LAYER.fill(usercolor);
+  push()
   UI_LAYER.stroke(0);
   UI_LAYER.strokeWeight(4);
+  UI_LAYER.fill(usercolor);
   UI_LAYER.textAlign(LEFT);
-  
   UI_LAYER.text(username, pos_x+5, pos_y-20);
+  pop();
 }
 
 function drawUI() {
   UI_LAYER.clear();
   
 
-  if (!(current_tool == 'eraser' || current_tool == 'eyedropper')) {
+  if (!(current_tool == 'eyedropper' || current_tool == 'fill' || current_tool == 'eraser')) {
     push()
     UI_LAYER.fill(red(colorPicker.value()),green(colorPicker.value()),blue(colorPicker.value()),alphaSlider.value())
     if(current_tool == 'pencil') {
@@ -23,13 +24,18 @@ function drawUI() {
       UI_LAYER.ellipse(parseInt(mouseX), parseInt(mouseY), strokeWidth * ZOOM.scale_factor, strokeWidth * ZOOM.scale_factor);
     }
     pop();
+  } else if (current_tool == 'eyedropper' || current_tool == 'fill') {
+    push();
+    UI_LAYER.fill(red(colorPicker.value()),green(colorPicker.value()),blue(colorPicker.value()),alphaSlider.value())
+    UI_LAYER.ellipse(parseInt(mouseX), parseInt(mouseY), 4, 4);
+    pop();
   }
   
   drawUsername(user,ucolor,parseInt(mouseX),parseInt(mouseY))
 
   while (USER_LABELS.length > 0) {
     let label = USER_LABELS.shift();
-    drawUsername(label.username,label.ucolor,parseInt((label.rawx - OFFSET.x) / ZOOM.scale_factor),parseInt((label.rawy - OFFSET.y) / ZOOM.scale_factor))
+    drawUsername(label.username,label.ucolor,parseInt((label.x + OFFSET.x)),parseInt((label.y + OFFSET.y)))
   }
   
   

@@ -3,10 +3,22 @@ function performAction(event) {
     case "ADD": {
       // push stroke
       //console.log(`layers before:`,LAYERS[event.action.layer].stroke_history)
-      LAYERS[event.action.layer].stroke_history.push(event.action)
-      console.log(`${event.action.id} pushed to ${event.action.layer}?`)
-      LAYERS[event.action.layer].live.clear();
-      LAYERS[event.action.layer].mask.background((255,255,255,255));
+      
+      if(event.action.type == 'delete' || event.action.type == 'add') {
+        try {
+          if(event.action.type == 'delete') {
+            deleteCurrentLayer(event.action.layer)
+          } else {
+            createNewLayer()
+          }
+        } catch(err) {
+          console.warn('error!',err)
+        }
+      } else {
+        LAYERS[event.action.layer].stroke_history.push(event.action)
+        LAYERS[event.action.layer].live.clear();
+        LAYERS[event.action.layer].mask.background((255,255,255,255));
+      }
       //console.log(`layers after:`,LAYERS[event.action.layer].stroke_history)
       // check undo stack and mark some stuff as bakeable for later
       if (UNDO_STACK.length > MAX_UNDOS) {
