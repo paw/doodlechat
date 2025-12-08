@@ -14,7 +14,28 @@
     <div class="wrapper">
         <nav class="navbar"><%- include('../partials/toolbar.ejs') %></nav>
         <main><%- body %></main>
-        <%- include('../partials/footer.ejs') %>
+        <div id="loading" class="modal hide">
+            <div class="inner">
+                Please wait...
+            <div class="spinner"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--!Font Awesome Pro v7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2025 Fonticons, Inc.--><path opacity=".4" d="M41 403.1l67.9-67.9 67.9 67.9-67.9 67.9-67.9-67.9zM208 416l96 0 0 96-96 0 0-96zM335.2 108.9l67.9-67.9 67.9 67.9-67.9 67.9-67.9-67.9zm0 294.2l67.9-67.9 67.9 67.9-67.9 67.9-67.9-67.9zM416 208l96 0 0 96-96 0 0-96z"/><path d="M208 96l96 0 0-96-96 0 0 96zM0 208l0 96 96 0 0-96-96 0zm41-99.1l67.9 67.9 67.9-67.9-67.9-67.9-67.9 67.9z"/></svg></div>
+            </div>
+        </div>
+        <div id="layers" class="modal hide">
+            <div class="inner">
+                <h2>Select a Layer:</h2>
+                <ul id="list">
+                </ul>
+                <li class="hide" data-name="template">Layer <span data-name="number"></span>. Users: <span data-name="users"></span><button>Change</button></li>
+            </div>
+            </div>
+        <div id="canvas-size" class="modal hide">
+            <h2>Change Canvas Size:</h2>
+            <div class="grid 2-col">
+                <label for="new-width">Width:</label><input type="number" min="50" max="1500" id="new-width">
+                <label for="new-height">Height:</label><input type="number" min="50" max="1500" id="new-height">
+                <button id="request-new-dims">Change Canvas Size</button>
+            </div>
+        </div>
     </div>
     <script type="text/javascript" src="/js/main.js"></script>
     <script type="text/javascript" src="/js/tools.js"></script>

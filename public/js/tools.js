@@ -1,12 +1,7 @@
-function lineBresenham(layer, strokeWidth, ucolor) {
+function lineBresenham(layer, pX, pY, cX, cY, strokeWidth, ucolor) {
   layer.loadPixels();
 
-  let pX = int((pmouseX - OFFSET.x) / ZOOM.scale_factor),
-      pY = int((pmouseY - OFFSET.y) / ZOOM.scale_factor),
-      cX = int((mouseX - OFFSET.x) / ZOOM.scale_factor),
-      cY = int((mouseY - OFFSET.y) / ZOOM.scale_factor),
-  
-      dx = abs(cX - pX),
+  let dx = abs(cX - pX),
       dy = -abs(cY - pY),
       
       sx = (pX < cX) ? 1 : -1,
@@ -64,19 +59,6 @@ function replaceMaskColor(layer,action) {
   }
   layer.mask.updatePixels();
   layer.mask_baked.updatePixels();
-}
-
-function pencil(layer) {
-  layer.loadPixels();
-  alphaC = color(0,0);
-  for (var x = mouseX - strokeWidth; x < mouseX+strokeWidth; x++) {
-    for (var y = mouseY - strokeWidth; y < mouseY+strokeWidth; y++) {
-      if ((dist(x,y, mouseX, mouseY) < strokeWidth) && x > 0 && x <= width) {
-        layer.set(x,y,alphaC);
-      }
-    }
-  }
-  layer.updatePixels();
 }
 
 function getStroke(action, stroke_start_x, stroke_start_y, box_width, box_height) {

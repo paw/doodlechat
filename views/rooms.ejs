@@ -1,0 +1,8 @@
+<ol id="rooms">
+    <% rooms.forEach((room)=>{ %>
+        <li><a href="/draw/<%= room.id %>"><%= room.name%></a>, HOST: <%= room.host %></li>
+    <%});%>
+    <% if (rooms.length == 0) { %>
+        <i>There are no public rooms! Why don't you host one?</i>
+    <% } %>
+</ol>
