@@ -10,6 +10,7 @@ let user, ucolor,
     activeSelection = false,
     selectionStart = {x: 0, y: 0},
     selectionEnd = {x: 0, y: 0},
+    ROOM,
 
     HOST = false,
     ADMIN = false,
@@ -60,7 +61,8 @@ function setup() {
 
     // otherwise we get stuff from local storage ^_^
     ucolor = localStorage.getItem('draw-color');
-
+    // get room name from url, making sure to drop any junk params jic
+    ROOM = window.location.href.split('?')[0].substring(window.location.href.lastIndexOf('/') + 1);
 
     // instance mode for layers:
     // https://github.com/processing/p5.js/wiki/
@@ -107,6 +109,7 @@ function setup() {
             username: user,
             color: ucolor,
             current_layer: 0,
+            room: ROOM
         });
     });
     socket.on('disconnect', data => {
@@ -114,8 +117,14 @@ function setup() {
       window.location.replace("/");
     });
 
+    socket.on('failure', data => {
+      console.log("ROOM DOES NOT EXIST")
+      socket.disconnect();
+      window.location.replace("/");
+    });
+
     socket.on('make_host', data => {
-      // admin actions are verified on server so even if this is set by js nothing will happen.
+      // admin actions are verified on server so even if this is set by client nothing will happen.
       HOST = true;
       ADMIN = true;
       document.querySelectorAll(`[data-type="admin"]`).forEach(ele => {

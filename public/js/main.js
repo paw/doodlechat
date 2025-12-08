@@ -19,8 +19,6 @@ function ready() {
       window.location.replace("/")
     }
 
-    /*// layer creation
-    */
 };
 
 // Source - https://stackoverflow.com/a/56266358

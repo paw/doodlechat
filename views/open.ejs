@@ -1,0 +1,22 @@
+<h1>
+    Open a room:
+</h1>
+<form action="/open-room" method="POST" class="grid col-2">
+<label for="name">Room Name:</label><input type="text" id="name" name="name" required>
+<label for="url">Room URL:</label><input type="text" id="url" name="url" required>
+<label for="private">Private?</label><input type="checkbox" name="private" id="private">
+<input type="text" class="hide" name="host" id="host" required>
+<button type="submit" disabled="true" id="submit">SUBMIT</button>
+</form>
+<script>
+    function run() {
+        user = localStorage.getItem('draw-username');        
+        if (user == null) {
+            window.location.replace("/settings");
+        } else {
+            document.querySelector(`[name="host"]`).value = user;
+            document.querySelector("#submit").disabled = false;
+        }
+    }
+    run()
+</script>
