@@ -334,21 +334,24 @@ function changeDrawingAreaSize(x, y) {
   // update all layers with the NEW size
   for (let i = 0; i < LAYERS.length; i++) {
 
-    let old_live = LAYERS[i].live;
-    let old_mask = LAYERS[i].mask;
+    let old_live = LAYERS[i].live,
+        old_baked = LAYERS[i].baked,
+        old_mask = LAYERS[i].mask;
 
     // create new graphics
     LAYERS[i].live = createGraphics(cWidth, cHeight).pixelDensity(1);
     LAYERS[i].mask = createGraphics(cWidth, cHeight).pixelDensity(1);
+    LAYERS[i].baked = createImage(cWidth, cHeight).pixelDensity(1);
 
     // draw previous content into the new resized canvas
     LAYERS[i].live.image(old_live, 0, 0);
+    LAYERS[i].baked.copy(old_baked, 0, 0, old_baked.width, old_baked.height,0, 0, old_baked.width, old_baked.height);
 
     // fill new mask with white and draw old mask on top
     LAYERS[i].mask.background(255);
     LAYERS[i].mask.image(old_mask, 0, 0);
 
-    // clanup
+    // cleanup
     old_live.remove();
     old_mask.remove();
   }
