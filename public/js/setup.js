@@ -8,9 +8,10 @@ function preview() {
 }
 
 function saveSettings() {
+    document.getElementById("user").value = document.getElementById("user").value.replace(/ +(?= )/g,'').trim()
     preview();
 
-    if (! (document.getElementById("user").value.length <= 20 && document.getElementById("user").value.length >= 1) ) {
+    if (! (document.getElementById("user").value.replace(/ +(?= )/g,'').trim().length <= 20 && document.getElementById("user").value.replace(/ +(?= )/g,'').trim().length >= 1) ) {
         alert("You must enter a valid username between 1 and 20 characters in length.")
         document.getElementById("user").value = '';
         document.getElementById("user").focus();

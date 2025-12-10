@@ -13,7 +13,7 @@ function drawUsername(username,usercolor,pos_x,pos_y) {
 
 function drawUI() {
   UI_LAYER.clear();
-  
+  UI_LAYER.textSize(16);
 
   if (!(current_tool == 'eyedropper' || current_tool == 'fill' || current_tool == 'eraser')) {
     push()
@@ -43,10 +43,10 @@ function drawUI() {
   UI_LAYER.fill(0);
   UI_LAYER.text(`actual x: ${parseInt(mouseX)} y: ${parseInt(mouseY)}`, 10, 15);
   
-  UI_LAYER.text(`relative x: ${parseInt((mouseX - OFFSET.x) / ZOOM.scale_factor)} y: ${parseInt((mouseY - OFFSET.y) / ZOOM.scale_factor)}`, 10, 30);
+  UI_LAYER.text(`relative x: ${parseInt((mouseX - OFFSET.x) / ZOOM.scale_factor)} y: ${parseInt((mouseY - OFFSET.y) / ZOOM.scale_factor)}`, 10, 35);
   
   
   UI_LAYER.textAlign(RIGHT);
   UI_LAYER.text(`layer #${current_layer+1} / ${LAYERS.length} - ${current_tool} ${strokeWidth}px ${ucolor}`,UI_LAYER.width - 20,15)
-  UI_LAYER.text(`total actions: ${action_cnt}`,UI_LAYER.width - 20,30)
+  UI_LAYER.text(`total actions: ${action_cnt}`,UI_LAYER.width - 20,35)
 }
