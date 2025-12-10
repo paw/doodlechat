@@ -122,7 +122,7 @@ function setup() {
       window.location.replace("/");
     });
     socket.on('set_page_title', data => {
-      document.title = `${data} - DRAW`;
+      document.title = `${data} - Drawing on DoodleChat`;
     })
     socket.on('make_host', data => {
       // admin actions are verified on server so even if this is set by client nothing will happen.

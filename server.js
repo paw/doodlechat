@@ -41,16 +41,16 @@ const io = require('socket.io')(server, {
 app.enable('verbose errors');
 
 app.get('/', (req, res) => {
-  res.render('index', { title: 'MAIN PAGE', layout: './layouts/main' })
+  res.render('index', { title: 'DoodleChat - Home', layout: './layouts/main' })
 })
 app.get('/settings', (req, res) => {
-  res.render('settings', { title: 'USER SETTINGS', layout: './layouts/main' })
+  res.render('settings', { title: 'DoodleChat - User Settings', layout: './layouts/main' })
 })
 app.get('/join', (req, res) => {
-  res.render('rooms', { title: 'JOIN AN OPEN ROOM', rooms: rooms.filter(ele => ele.public == true), layout: './layouts/main' })
+  res.render('rooms', { title: 'DoodleChat - Join a Room', rooms: rooms.filter(ele => ele.public == true), layout: './layouts/main' })
 })
 app.get('/open', (req, res) => {
-  res.render('open', { title: 'OPEN A ROOM', layout: './layouts/main' })
+  res.render('open', { title: 'DoodleChat - Open a Room', layout: './layouts/main' })
 })
 app.post('/open-room', (req, res) => {
     console.log(req.body);
@@ -78,14 +78,7 @@ app.post('/open-room', (req, res) => {
     }
 })
 app.get('/draw/:id', (req, res) => {
-  res.render('paint', { title: 'DRAW', layout: './layouts/paint' })
-})
-app.get('/login', (req, res) => {
-    res.send('<form method=POST action=/login><input type=text name=username><input type=number name=age><input type=submit></form>')
-})
-app.post('/login', (req, res) => {
-    console.log(req.body)
-    res.send('data has been recieved by the server')
+  res.render('paint', { title: 'Drawing on DoodleChat', layout: './layouts/paint' })
 })
 
 io.sockets.on('connection', (socket) => {
@@ -492,14 +485,14 @@ io.sockets.on('connection', (socket) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).render('500', {
-    title: "Server Error",
+    title: "DoodleChat - Server Error",
     layout: './layouts/main',
     error: err
   });
 });
 app.use((req, res, next) => {
   res.status(404).render('404', {
-    title: "Page Not Found",
+    title: "DoodleChat - Page Not Found",
     layout: './layouts/main'
   });
 });
