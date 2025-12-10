@@ -7,11 +7,6 @@ function ready() {
             option.querySelector(".dropdown").classList.toggle("show");
         });
     })
-    document.querySelectorAll(".dropdown li").forEach(option => {
-        option.addEventListener("click", (event) => {
-            console.log(option.getAttribute("data-action"));
-        });
-    })
     let params = new URLSearchParams(document.location.search);
     let kicked = params.get("kicked");
     if (kicked != null) {

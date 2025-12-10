@@ -13,7 +13,7 @@ function drawUsername(username,usercolor,pos_x,pos_y) {
 
 function drawUI() {
   UI_LAYER.clear();
-  
+  UI_LAYER.textSize(16);
 
   if (!(current_tool == 'eyedropper' || current_tool == 'fill' || current_tool == 'eraser')) {
     push()

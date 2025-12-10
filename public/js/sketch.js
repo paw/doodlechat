@@ -55,9 +55,9 @@ function setup() {
             
     if (user == null) {
         window.location.replace("/settings");
-    }/* else if (isReload || isBackForward) {
+    } else if (isReload || isBackForward) {
         window.location.replace("/");
-    }*/
+    }
 
     // otherwise we get stuff from local storage ^_^
     ucolor = localStorage.getItem('draw-color');
@@ -85,7 +85,7 @@ function setup() {
         baked : createImage(cWidth, cHeight).pixelDensity(1),
         removed : false,
         hidden: false,
-        history_start: 0,
+        history_start: [0],
         stroke_history: []
         };
         lyr.mask.background(255,255,255,255) 
@@ -116,13 +116,14 @@ function setup() {
       console.log("DISCONNECTED SOCKET")
       window.location.replace("/");
     });
-
     socket.on('failure', data => {
       console.log("ROOM DOES NOT EXIST")
       socket.disconnect();
       window.location.replace("/");
     });
-
+    socket.on('set_page_title', data => {
+      document.title = `${data} - DRAW`;
+    })
     socket.on('make_host', data => {
       // admin actions are verified on server so even if this is set by client nothing will happen.
       HOST = true;
@@ -192,7 +193,7 @@ function setup() {
         data.img = createSpriteFromPixelsArray(data)
         // store in layer array
         ACTION_QUEUE.push({
-          type: "ADD",
+          type: "NEW_STROKE",
           action: data
         });
     });
@@ -205,39 +206,55 @@ function setup() {
     ACTION_QUEUE.push({type: "REDO_REMOTE", action: data})
   });
 
-  socket.on("update_connections", data => {
-    CONNECTIONS.find(ele => ele.socket_id == data.socket_id).current_layer = data.current_layer
+  socket.on("update_users_layer", data => {
+    CONNECTIONS.find(ele => ele.socket_id == data.socket_id).current_layer = data.layer
   });
 
 	socket.on('get_canvas_progress', data => {
-    document.querySelector("#loading").classList.remove("hide");
     // right now just sending & receiving entire action stack from server, eventually will implement getting canvas progress up to a certain point
-        data.forEach(action => {
-          console.log(action)
-          if (action.pixels != undefined)
-            {
-              action.img = createSpriteFromPixelsArray(action)
-            }
-          ACTION_QUEUE.push({
-            type: "ADD",
-            action: action
-          });
-        })
-      document.querySelector("#loading").classList.add("hide");
-        console.log(`got current canvas info`)
+    console.log(`successfully receieved ${data.length} actions.`)
+    data.forEach(action => {
+      if (action.pixels != undefined) {
+        action.img = createSpriteFromPixelsArray(action)
+      }
+      ACTION_QUEUE.push({
+        type: "NEW_STROKE",
+        action: action
+      });
+    })
+    document.querySelector("#loading").classList.add("hide");
+    console.log(`got current canvas info`)
 	});
     socket.on('get_chat_history', data => {
         console.log("loaded active canvas");
 	});
 
   socket.on('confirm_delete_layer', data => {
-      deleteCurrentLayer(data.layer)
+      //deleteCurrentLayer(data.layer)
+      ACTION_QUEUE.push({
+        type: "NEW_STROKE",
+        action: data
+      })
       console.log(`admin ${data.username} deleted layer ${data.layer}`)
 	});
 
   socket.on('confirm_add_layer', data => {
-      createNewLayer()
+      //createNewLayer()
+      ACTION_QUEUE.push({
+        type: "NEW_STROKE",
+        action: data
+      })
       console.log(`admin ${data.username} created new layer`)
+	});
+
+  socket.on('confirm_clear_layer', data => {
+      //createNewLayer()
+      console.log("CONFIRM CLEAR?",data)
+      ACTION_QUEUE.push({
+        type: "NEW_STROKE",
+        action: data
+      })
+      console.log(`admin ${data.username} cleared layer`)
 	});
 
     // when disconnect we will remove them
@@ -247,6 +264,7 @@ function setup() {
 	})
     socket.on('user_join', data => {
         console.log(`${data.username} has joined.`);
+        USER_LABELS.push({socket: data.socket_id, username: data.username, color: data.color, x: 0, y: 0, show: false})
         document.querySelector("#chatwrap ul").append(chatLine(data.username, data.color, ' has joined.'));
 	})
     socket.on('receive_chat_message', data => {
@@ -290,11 +308,11 @@ function setup() {
         undo_btn = select('#undo'),
         redo_btn = select('#redo'),
         zoom_btn = select('#zoom'),
-        clear_button = select('li[data-action="clear"]'),
         exit = select("#exit"),
         chat = document.querySelector("#chat"),
         navbar = document.querySelector(".navbar"),
-        tools = document.querySelector("#controls");
+        tools = document.querySelector("#controls"),
+        modals = document.querySelectorAll(".modal");
 
     colorPicker.value('#000');
     alphaSlider.value(255);
@@ -324,12 +342,14 @@ function setup() {
         document.body.classList.remove("modal-open")
       })
     })
-
-    /*document.querySelector("#layer_select").addEventListener("change", function() {
-        let val = layer_select.value();
-        current_layer = val;
-        console.log(`layer is now ${current_layer}`)
-    })*/
+    modals.forEach(element => {
+      element.addEventListener("mouseover", (event) => {
+        document.body.classList.add("modal-open")
+      })
+      element.addEventListener("mouseout", (event) => {
+        document.body.classList.remove("modal-open")
+      })
+    });
 
     eraser_button.mouseClicked(() => {
         changeActiveTool('eraser')
@@ -349,15 +369,18 @@ function setup() {
     zoom_btn.mouseClicked(() => {
         changeActiveTool('zoom')
     })
-    clear_button.mouseClicked(() => {
-        console.log(`clear layer: ${current_layer}`);
-        LAYERS[current_layer].clear();
-        socket.emit('clear_canvas',{layer: current_layer})
-    })
     document.querySelector(`[data-action="new-layer"]`).addEventListener("click", (event) => {
         if (ADMIN || HOST) {
           if (window.confirm(`Are you sure you want to add a new layer?`)) {
             request_add_layer()
+            event.target.parentNode.classList.remove("show");
+          }
+        }
+    })
+    document.querySelector(`[data-action="clear-layer"]`).addEventListener("click", (event) => {
+        if (ADMIN || HOST) {
+          if (window.confirm(`Are you sure you want to clear layer #${current_layer+1}?`)) {
+            request_clear_layer(current_layer)
             event.target.parentNode.classList.remove("show");
           }
         }
@@ -375,21 +398,23 @@ function setup() {
       event.target.parentNode.classList.remove("show");
       document.body.classList.add("modal-open")
         let modal = document.querySelector("#layers"),
-            list = modal.querySelector("#list"),
+            list = modal.querySelector("#layerlist"),
             temp = modal.querySelector(`[data-name="template"]`);
         modal.classList.remove("hide");
         list.innerHTML = '';
         LAYERS.forEach((layer,index) => {
           let li = temp.cloneNode(true);
+          li.setAttribute("data-name",`layer${index}`)
           li.classList.remove('hide');
           let ulist = CONNECTIONS.filter(ele => ele.current_layer == index);
           ulist.forEach(user => {
-            li.querySelector(`[data-name="users"]`).innerHTML += `<span style="color:${user.color}>${user.username}</span>, `
+            li.querySelector(`[data-name="users"]`).innerHTML += `<b style="color:${user.color}">${user.username}</b> `
           })
           li.querySelector('[data-name="number"]').innerText = index+1;
           li.querySelector("button").addEventListener("click", function() {
             current_layer = index;
-            socket.emit("layer_change",{ new_layer: current_layer})
+            CONNECTIONS.find(ele => ele.socket_id == socket.id).current_layer = current_layer;
+            socket.emit("update_current_layer",{ layer: current_layer })
             modal.classList.add('hide');
             document.querySelector("#art canvas").focus();
             document.body.classList.remove("modal-open")
@@ -397,6 +422,15 @@ function setup() {
           list.append(li)
         })
     })
+
+    document.querySelector(`[data-action="save-canvas"]`).addEventListener("click", (event) => {
+      event.target.parentNode.classList.remove("show");
+      saveFlatCanvas()
+    });
+    document.querySelector(`[data-action="save-layer"]`).addEventListener("click", (event) => {
+      event.target.parentNode.classList.remove("show");
+      saveOneLayer(LAYERS[current_layer])
+    });
 
     document.querySelector("#chatsend").addEventListener("click", (event) => {
         sendChatMessage();
@@ -440,7 +474,37 @@ function request_add_layer() {
     console.log("hit max layer count");
     return;
   }
-  socket.emit('request_add_layer')
+  action_cnt++;
+  let action = {
+        id: genActId(),
+        username: user,
+        timestamp : Date.now(),
+        type: 'add_layer',
+        baked: false,
+        undid: false,
+        finalized: true,
+    }
+  socket.emit('request_add_layer',action)
+}
+
+function request_clear_layer(layer) {
+  if (LAYERS[layer].stroke_history.length-1 == LAYERS[layer].history_start[LAYERS[layer].history_start.length-1]) {
+    alert("You just cleared this layer.");
+    return;
+  }
+  action_cnt++;
+  let action = {
+        id: genActId(),
+        username: user,
+        timestamp : Date.now(),
+        layer: layer,
+        type: 'clear_layer',
+        new_index: LAYERS[layer].stroke_history.length,
+        baked: false,
+        undid: false,
+        finalized: true,
+    }
+  socket.emit('request_clear_layer',action)
 }
 
 function request_delete_layer(layer) {
@@ -449,7 +513,18 @@ function request_delete_layer(layer) {
     console.log("need at least one layer");
     return;
   }
-  socket.emit('request_delete_layer',{layer: layer})
+  action_cnt++;
+  let action = {
+        id: genActId(),
+        username: user,
+        timestamp : Date.now(),
+        layer: layer,
+        type: 'delete_layer',
+        baked: false,
+        undid: false,
+        finalized: true,
+    }
+  socket.emit('request_delete_layer',action)
 }
 
 function windowResized() {
@@ -660,104 +735,6 @@ function createSpriteFromPixelsArray(data) {
     return img;
 }
 
-
-function deleteCurrentLayer(current) {
-  
-  //console.log(LAYERS)
-  if (LAYERS.length == 1) { console.log("need at least one layer"); return; }
-  
-  let deadlayer = LAYERS[current];
-  console.log(LAYERS[current],LAYERS)
-  let index = LAYERS.indexOf(deadlayer)
-  LAYERS.splice(index,1)
-  console.log("REMOVED",LAYERS)
-  deadlayer.live.remove();
-  deadlayer.mask.remove();
-  delete deadlayer.baked;
-  delete deadlayer.stroke_history;
-  deadlayer.removed = true;
-  // remove any actions assigned to this layer index from the undo stack
-  UNDO_STACK = UNDO_STACK.filter(function(action){return action.layer != current});
-  // shift user to nearest layer
-  current_layer = (current-1 < 0 ) ? 0 : current-1;
-  /*push delete layer into a global redo/undo stack?*/
-}
-
-function createNewLayer() {
-  if (LAYERS.length+1 > MAX_LAYERS) { console.log("you hit the max, sorry!"); return; }
-    // push empty layer
-    try {
-      let lyr = {
-        live : createGraphics(cWidth,cHeight).pixelDensity(1),
-        mask: createGraphics(cWidth,cHeight).pixelDensity(1), // https://p5js.org/reference/p5/clip/
-        baked : createImage(cWidth, cHeight).pixelDensity(1), //createGraphics(cWidth,cHeight).pixelDensity(1),
-        removed: false,
-        hidden: false,
-        history_start: 0,
-        stroke_history: []
-      };
-      lyr.mask.background(255,255,255,255)
-      LAYERS.push(lyr)
-      console.log(`created new layer: ${LAYERS.length}`)
-    } catch (err) {
-      console.log(`cannot make new layer! ${err}`)
-    }
-}
-
-function changeDrawingAreaSize(x, y) {
-
-  // clamping canvas size
-  if (x < 50 || y < 50 || x > 1000 || y > 1000) {
-    console.log("new canvas dims too big or too small");
-    return;
-  }
-  
-  // set new canvas size
-  cWidth = x;
-  cHeight = y;
-
-  // backup old
-  let old_action = ACTION_LAYER,
-      old_checkers = CHECKERBOARD,
-      old_active = ACTIVE_AREA;
-
-  // recreate with new size
-  ACTION_LAYER = createGraphics(cWidth, cHeight).pixelDensity(1);
-  CHECKERBOARD = createGraphics(cWidth, cHeight).pixelDensity(1);
-  ACTIVE_AREA = createGraphics(cWidth, cHeight).pixelDensity(1);
-  createCheckerboard();
-  
-  // cleanup
-  old_action.remove();
-  old_checkers.remove();
-  old_active.remove();
-
-  // update all layers with the NEW size
-  for (let i = 0; i < LAYERS.length; i++) {
-
-    let old_live = LAYERS[i].live;
-    let old_mask = LAYERS[i].mask;
-
-    // create new graphics
-    LAYERS[i].live = createGraphics(cWidth, cHeight).pixelDensity(1);
-    LAYERS[i].mask = createGraphics(cWidth, cHeight).pixelDensity(1);
-
-    // draw previous content into the new resized canvas
-    LAYERS[i].live.image(old_live, 0, 0);
-
-    // fill new mask with white and draw old mask on top
-    LAYERS[i].mask.background(255);
-    LAYERS[i].mask.image(old_mask, 0, 0);
-
-    // clanup
-    old_live.remove();
-    old_mask.remove();
-  }
-
-  // recalc offset with NEW width/height
-  OFFSET = calculateOffset();
-}
-
 function genActId(cnt = 0) {
     return (
         `${user}-${Date.now().toString(36)}-${action_cnt+cnt}`
@@ -921,7 +898,7 @@ function mouseReleased() {
 
     // add to queue
     ACTION_QUEUE.push({
-      type: "ADD",
+      type: "NEW_STROKE",
       action: action
     });
     UNDO_STACK.push(action)
@@ -974,15 +951,24 @@ function keyPressed() {
     if (key === 'r' || key === 'R') {
       changeActiveTool('zoom')
     }
+    if (key === 'e' || key === 'E') {
+      changeActiveTool('eyedropper')
+    }
     if (key === 'w' || key === 'W') {
       if (current_tool == 'zoom') {
         
       } else if (strokeWidth < 100) {
         strokeWidth += 2;
+        document.querySelector("#stroke-width-picker").value = strokeWidth;
+        document.querySelector('#current_stroke_width').innerText = document.querySelector("#stroke-width-picker").value;
       }
     }
-    if (key === 'q' || key === 'Q' && strokeWidth > 2) {
-      strokeWidth -= 2;
+    if (key === 'q' || key === 'Q') {
+      if (strokeWidth > 2) {
+        strokeWidth -= 2;
+        document.querySelector("#stroke-width-picker").value = strokeWidth;
+        document.querySelector('#current_stroke_width').innerText = document.querySelector("#stroke-width-picker").value
+      }
     }
     if (key === " ") {
       // create layer

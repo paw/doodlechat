@@ -60,20 +60,20 @@ app.post('/open-room', (req, res) => {
     if (req.body.private == 'on') {
       public = false;
     }
-    id = id.replace(/[^\w\s]/gi, '').replace(/ /gi,'-');
-    if (rooms.filter(ele => ele.id == id).length > 0) {
+    let fin_id = id.replace(/[^\w\s]/gi, '').replace(/ /gi,'-');
+    if (rooms.filter(ele => ele.id == id).length > 0 || fin_id.length == 0) {
       res.send("error!")
     } else {
       // create a new room
         rooms.push({
         name: name,
-        id: id,
+        id: fin_id,
         public: public,
         actions_stack: [],
         chat_stack: []
       });
-      console.log(`success! room ${id} was created.`)
-      res.redirect(`/draw/${id}`)
+      console.log(`success! room ${fin_id} was created.`)
+      res.redirect(`/draw/${fin_id}`)
     }
 })
 app.get('/draw/:id', (req, res) => {
@@ -109,12 +109,14 @@ io.sockets.on('connection', (socket) => {
         data.host = false;
       }
       data.admin = false;
+      
       connections.push(data);
       socket.join(data.room);
       
       let room = rooms.find(ele => ele.id == data.room)
 
       // send global action stack for new joiner to process to be brought up to date
+      socket.emit("set_page_title",room.name)
       socket.emit("get_canvas_progress",room.actions_stack);
       socket.emit("get_chat_history",room.chat_stack);
 
@@ -224,13 +226,13 @@ io.sockets.on('connection', (socket) => {
     let admin = connections.find((element) => element.socket_id == socket.id),
         room = rooms.find((ele) => ele.id == admin.room);
     if (admin.host || admin.admin) {
-      socket.emit('confirm_delete_layer',{ layer: data.layer, username: admin.username })
-      socket.to(admin.room).emit('confirm_delete_layer',{ layer: data.layer, username: admin.username })
-      room.actions_stack.push({ type: 'delete', layer: data.layer})
+      socket.emit('confirm_delete_layer',data)
+      socket.to(admin.room).emit('confirm_delete_layer',data)
+      room.actions_stack.push(data)
       let msg = {
         username: admin.username,
         color: admin.color,
-        message: ` has deleted layer ${data.layer}.`
+        message: ` has deleted Layer ${data.layer+1}.`
       }
       socket.to(admin.room).emit('receive_server_message',msg);
       socket.emit('receive_server_message',msg);
@@ -249,9 +251,9 @@ io.sockets.on('connection', (socket) => {
     let admin = connections.find((element) => element.socket_id == socket.id),
         room = rooms.find((ele) => ele.id == admin.room);
     if (admin.host || admin.admin) {
-      socket.emit('confirm_add_layer',{ username: admin.username })
-      socket.to(admin.room).emit('confirm_add_layer', { username: admin.username })
-      room.actions_stack.push({ type: 'add' })
+      socket.emit('confirm_add_layer',data)
+      socket.to(admin.room).emit('confirm_add_layer', data)
+      room.actions_stack.push(data)
       let msg = {
         type: 'server',
         username: admin.username,
@@ -271,11 +273,43 @@ io.sockets.on('connection', (socket) => {
     }
   });
 
+  socket.on('request_clear_layer', (data) => {
+    let admin = connections.find((element) => element.socket_id == socket.id),
+        room = rooms.find((ele) => ele.id == admin.room);
+    if (admin.host || admin.admin) {
+      socket.emit('confirm_clear_layer',data)
+      socket.to(admin.room).emit('confirm_clear_layer', data)
+      room.actions_stack.push(data)
+      let msg = {
+        type: 'server',
+        username: admin.username,
+        color: admin.color,
+        message: ` has cleared Layer ${data.layer+1}.`
+      };
+      socket.emit('receive_server_message',msg);
+      socket.to(admin.room).emit('receive_server_message',msg);
+    } else {
+      // kick since you're not the host and something funny is happening
+      socket.emit('kick');
+      socket.to(admin.room).emit('receive_server_message',{
+        username: admin.username,
+        color: admin.color,
+        message: ' has been KICKED by the server due to funny business.'
+      });
+    }
+  });
+
+  socket.on('update_current_layer', (data) => {
+    let user = connections.find(ele => ele.socket_id == socket.id),
+        room = rooms.find(ele => ele.id == user.room);
+    user.current_layer = data.layer;
+    socket.to(room.id).emit('update_users_layer', {socket_id: socket.id, layer: data.layer});
+  });
 
   socket.on('send_canvas_action', (data) => {
     let room_data = connections.find(ele => ele.socket_id == socket.id).room,
         room = rooms.find(ele => ele.id == room_data);
-    socket.to(room).emit('get_canvas_action', data);
+    socket.to(room.id).emit('get_canvas_action', data);
   });
   socket.on('send_finalized_action', (data) => {
     let room_data = connections.find(ele => ele.socket_id == socket.id).room,

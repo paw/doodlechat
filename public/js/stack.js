@@ -1,23 +1,31 @@
 function performAction(event) {
   switch(event.type) {
-    case "ADD": {
+    case "NEW_STROKE": {
       // push stroke
       //console.log(`layers before:`,LAYERS[event.action.layer].stroke_history)
       
-      if(event.action.type == 'delete' || event.action.type == 'add') {
+      if(event.action.type == 'delete_layer' || event.action.type == 'add_layer' || event.action.type == 'clear_layer') {
+        console.log("EVENT",event,event.action.layer,LAYERS[event.action.layer])
         try {
-          if(event.action.type == 'delete') {
+          if(event.action.type == 'delete_layer') {
             deleteCurrentLayer(event.action.layer)
-          } else {
+          } else if (event.action.type == 'add_layer') {
             createNewLayer()
+          } else {
+            clearLayer(event.action.layer,event.action.new_index);
+            LAYERS[event.action.layer].stroke_history.push(event.action)
           }
         } catch(err) {
           console.warn('error!',err)
         }
       } else {
-        LAYERS[event.action.layer].stroke_history.push(event.action)
-        LAYERS[event.action.layer].live.clear();
-        LAYERS[event.action.layer].mask.background((255,255,255,255));
+        try {
+          LAYERS[event.action.layer].stroke_history.push(event.action)
+          LAYERS[event.action.layer].live.clear();
+          LAYERS[event.action.layer].mask.background((255,255,255,255));
+        } catch(err) {
+          console.warn(`error!`,err)
+        }
       }
       //console.log(`layers after:`,LAYERS[event.action.layer].stroke_history)
       // check undo stack and mark some stuff as bakeable for later
@@ -25,10 +33,9 @@ function performAction(event) {
         for(let i = 0; i < BAKE_UNDOS; i++) {
           try {
             let act = UNDO_STACK.shift(),
-              to_bake = LAYERS[act.layer].stroke_history.filter(action => action.id == act.id)[0];
-
-            console.log(act,to_bake)
-          to_bake.baked = true;
+              to_bake = LAYERS[act.layer].stroke_history.find(action => action.id == act.id);
+              to_bake.baked = true;
+              //socket.emit('bake_req',{})
           } catch(err) {
             console.log(err)
           }
@@ -103,6 +110,15 @@ function performAction(event) {
 
 }
 
+function clearLayer(layer_index,new_history_start) {
+  console.log(layer_index,new_history_start)
+  let layer = LAYERS[layer_index];
+  layer.history_start.push(new_history_start);
+  LAYERS[layer_index].live.clear();
+  LAYERS[layer_index].mask.background((255,255,255,255));
+  console.log(`layer ${layer_index} cleared.`)
+}
+
 
 function undo() {
     
@@ -112,7 +128,10 @@ function undo() {
     // Pop the last stroke
     let undid_action = UNDO_STACK.pop(),
         hist = LAYERS[undid_action.layer].stroke_history,
-        actual_stroke_data = hist.filter((action) => action.id == undid_action.id)[0];
+        actual_stroke_data = hist.find((action) => action.id == undid_action.id);
+    if (undid_action.type == 'clear_layer') {
+      LAYERS[undid_action.layer].history_start.pop()
+    }
     actual_stroke_data.undid = true;
     undid_action.undid = true;
     REDO_STACK.push(undid_action);
@@ -130,7 +149,10 @@ function redo() {
     // Pop the last stroke
     let redid_action = REDO_STACK.pop(),
         hist = LAYERS[redid_action.layer].stroke_history,
-        actual_stroke_data = hist.filter((action) => action.id == redid_action.id)[0];
+        actual_stroke_data = hist.find((action) => action.id == redid_action.id);
+    if (redid_action.type == 'clear_layer') {
+      LAYERS[redid_action.layer].history_start.push(redid_action.new_history_start)
+    }
     actual_stroke_data.undid = false;
     redid_action.undid = false;
     UNDO_STACK.push(redid_action);
@@ -142,8 +164,11 @@ function redo() {
 }
 function receiveUndo(data) {
   try {
-    let undo_me = LAYERS[data.layer].stroke_history.filter(action => action.id === data.id )[0]
+    let undo_me = LAYERS[data.layer].stroke_history.find(action => action.id === data.id )
     undo_me.undid = true;
+    if (undo_me.type == 'clear_layer') {
+      LAYERS[undo_me.layer].history_start.pop()
+    }
     console.log(`undo action ${undo_me.id} from ${undo_me.username}`)
   } catch(err) {
     console.warn("REMOTE UNDO ISSUE?",err)
@@ -152,8 +177,11 @@ function receiveUndo(data) {
 }
 function receiveRedo(data) {
   try {
-    let redo_me = LAYERS[data.layer].stroke_history.filter(action => action.id === data.id)[0]
+    let redo_me = LAYERS[data.layer].stroke_history.find(action => action.id === data.id);
     redo_me.undid = false;
+    if (redo_me.type == 'clear_layer') {
+      LAYERS[redo_me.layer].history_start.push(redo_me.new_index)
+    }
     console.log(`redo action ${redo_me.id} from ${redo_me.username}`)
   } catch (err) {
     console.warn("REMOTE REDO ISSUE?",err)
@@ -188,18 +216,26 @@ function createCheckerboard() {
   }
 }
 
+function clearLayer(layer_index) {
+  let layer = LAYERS[layer_index];
+  layer.history_start.push(layer.stroke_history.length);
+  console.log(layer.history_start)
+  layer.live.clear();
+  layer.mask.background((255,255,255,255));
+}
+
 function redrawLayer(layer) {
-  let stuff = layer.stroke_history;
   // make sure everything is drawn in order
-  stuff.sort(function(x, y){ return x.timestamp - y.timestamp; });
+  layer.stroke_history.sort(function(x, y){ return x.timestamp - y.timestamp; });
 
   let temp_image = createImage(layer.live.width, layer.live.height).pixelDensity(1);
     
     noSmooth();
     temp_image.copy(layer.baked, 0, 0, layer.baked.width, layer.baked.height, 0, 0, layer.baked.width, layer.baked.height);
     
-    stuff.forEach(one_bake => {
-      if(!one_bake.undid) {
+    for (let i = layer.history_start[layer.history_start.length-1]; i < layer.stroke_history.length; i++) {
+      one_bake = layer.stroke_history[i]
+      if(!one_bake.undid && one_bake.type != 'clear_layer') {
         if(one_bake.type == 'eraser') {
           temp_image.mask(one_bake.img);
         }
@@ -207,7 +243,7 @@ function redrawLayer(layer) {
           temp_image.copy(one_bake.img, 0, 0, one_bake.width, one_bake.height, one_bake.x, one_bake.y, one_bake.width, one_bake.height);
         } 
       }
-    })
+    };
     
   // finally mask the layer
     temp_image.mask(layer.mask);
@@ -215,9 +251,110 @@ function redrawLayer(layer) {
     return temp_image;
 }
 
+function deleteCurrentLayer(current) {
+  
+  //console.log(LAYERS)
+  if (LAYERS.length == 1) { console.log("need at least one layer"); return; }
+  
+  // TODO: change this to save layer for undos until a certain point is reached to allow for UNDO delete?
+  let deadlayer = LAYERS[current];
+  console.log(LAYERS[current],LAYERS)
+  let index = LAYERS.indexOf(deadlayer)
+  LAYERS.splice(index,1)
+  // TODO: temporarily delete layer to allow for undos?
+  // REMOVED_LAYERS.push(deadlayer)
+  // cleanup
+  deadlayer.live.remove();
+  deadlayer.mask.remove();
+  delete deadlayer.baked;
+  delete deadlayer.stroke_history;
+  deadlayer.removed = true;
+  // remove any actions assigned to this layer index from the undo stack
+  UNDO_STACK = UNDO_STACK.filter(function(action){return action.layer != current});
+  // shift user to nearest layer
+  current_layer = (current_layer-1 < 0 ) ? 0 : current_layer-1;
+  CONNECTIONS.find(ele => ele.socket_id == socket.id).current_layer = current_layer;
+  socket.emit("update_current_layer",{ layer: current_layer })
+}
+
+function createNewLayer() {
+  if (LAYERS.length+1 > MAX_LAYERS) { console.log("you hit the max, sorry!"); return; }
+    // push empty layer
+    try {
+      let lyr = {
+        live : createGraphics(cWidth,cHeight).pixelDensity(1),
+        mask: createGraphics(cWidth,cHeight).pixelDensity(1), // https://p5js.org/reference/p5/clip/
+        baked : createImage(cWidth, cHeight).pixelDensity(1), //createGraphics(cWidth,cHeight).pixelDensity(1),
+        removed: false,
+        hidden: false,
+        history_start: [0],
+        stroke_history: []
+      };
+      lyr.mask.background(255,255,255,255)
+      LAYERS.push(lyr)
+      console.log(`created new layer: ${LAYERS.length}`)
+    } catch (err) {
+      console.log(`cannot make new layer! ${err}`)
+    }
+}
+
+function changeDrawingAreaSize(x, y) {
+
+  // clamping canvas size
+  if (x < 50 || y < 50 || x > 1000 || y > 1000) {
+    console.log("new canvas dims too big or too small");
+    return;
+  }
+  
+  // set new canvas size
+  cWidth = x;
+  cHeight = y;
+
+  // backup old
+  let old_action = ACTION_LAYER,
+      old_checkers = CHECKERBOARD,
+      old_active = ACTIVE_AREA;
+
+  // recreate with new size
+  ACTION_LAYER = createGraphics(cWidth, cHeight).pixelDensity(1);
+  CHECKERBOARD = createGraphics(cWidth, cHeight).pixelDensity(1);
+  ACTIVE_AREA = createGraphics(cWidth, cHeight).pixelDensity(1);
+  createCheckerboard();
+  
+  // cleanup
+  old_action.remove();
+  old_checkers.remove();
+  old_active.remove();
+
+  // update all layers with the NEW size
+  for (let i = 0; i < LAYERS.length; i++) {
+
+    let old_live = LAYERS[i].live;
+    let old_mask = LAYERS[i].mask;
+
+    // create new graphics
+    LAYERS[i].live = createGraphics(cWidth, cHeight).pixelDensity(1);
+    LAYERS[i].mask = createGraphics(cWidth, cHeight).pixelDensity(1);
+
+    // draw previous content into the new resized canvas
+    LAYERS[i].live.image(old_live, 0, 0);
+
+    // fill new mask with white and draw old mask on top
+    LAYERS[i].mask.background(255);
+    LAYERS[i].mask.image(old_mask, 0, 0);
+
+    // clanup
+    old_live.remove();
+    old_mask.remove();
+  }
+
+  // recalc offset with NEW width/height
+  OFFSET = calculateOffset();
+}
+
 function saveOneLayer(layer) {
   let final_layer = redrawLayer(layer);
-  save(final_layer, `layer${LAYERS.indexOf(layer)}.png`);
+  save(final_layer, `layer${LAYERS.indexOf(layer)+1}.png`);
 }
 
 function importToLayer(layer) {

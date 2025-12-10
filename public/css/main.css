@@ -233,6 +233,24 @@ input.stroke_width_picker {
     border-radius: 0.2em;
     border: 1px solid #000;
     color: #000;
+    padding: 0.5em;
+    min-width: 200px;
+    max-width: 95%;
+    position: relative;
+}
+.modal .close {
+    position: absolute;
+    right: 0.2em;
+    top: 0.2em;
+}
+#loading {
+    text-align: center;
+}
+#layerlist {
+    padding: 0;
+}
+#layerlist li {
+    margin-top: 1em
 }
 .spinner {
     -webkit-animation:spin 4s linear infinite;
