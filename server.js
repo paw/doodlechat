@@ -435,8 +435,8 @@ io.sockets.on('connection', (socket) => {
       socket.to(found.room).emit('list_current_users', connections_in_room);
       let room = rooms.find(room => room.id == found.room);
       room.chat_stack.push({type: "leave",data: {
-        username: data.username,
-        color: data.color,
+        username: found.username,
+        color: found.color,
         message: ' has left.'
       }})
     
