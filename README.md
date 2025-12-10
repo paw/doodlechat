@@ -17,10 +17,11 @@ Made in Fall 2025 for SUNY Polytechnic Undergraduate Degree in Computer Science'
 <img width="500" height="500" alt="pumpkin" src="https://github.com/user-attachments/assets/ccd69693-eded-499c-a2b4-e77e9eca9973" />
 <img width="500" height="500" alt="crab" src="https://github.com/user-attachments/assets/e772029c-e601-44d7-bca7-9eae1ed4b32e" />
 <img width="500" height="500" alt="sheep" src="https://github.com/user-attachments/assets/3cc499db-06e9-46f9-bc38-3c76b783eae1" />
+<br><br>
+<img width="800" height="600" alt="spyro" src="https://github.com/user-attachments/assets/0f524f8c-5bda-4eab-a458-7aa674c5f026" />
+spyro drawing, total actions: 805
 
-<img width="800" height="600" alt="spyro" src="https://github.com/user-attachments/assets/0f524f8c-5bda-4eab-a458-7aa674c5f026" />\
-total actions: 805\
-layers:\
+exported individual layers:\
 <img width="800" height="600" alt="spyro1" src="https://github.com/user-attachments/assets/8af4916d-bce1-400c-b239-15e88915fd9b" />
 <img width="800" height="600" alt="spyro2" src="https://github.com/user-attachments/assets/9cfcc5c0-82a3-4dbd-9247-29b3bd921fb5" />
 <img width="800" height="600" alt="spyro3" src="https://github.com/user-attachments/assets/4c414d17-fa19-4a47-82d1-ea50b164aa81" />
