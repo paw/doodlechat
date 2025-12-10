@@ -225,8 +225,16 @@ function setup() {
     document.querySelector("#loading").classList.add("hide");
     console.log(`got current canvas info`)
 	});
-    socket.on('get_chat_history', data => {
-        console.log("loaded active canvas");
+  socket.on('get_chat_history', data => {
+    console.log(data)
+    data.forEach(message => {
+      if (message.type == "server") {
+        document.querySelector("#chatwrap ul").append(chatLine(`${message.data.username}`, message.data.color, ` ${message.data.message}`,true));
+      } else {
+        document.querySelector("#chatwrap ul").append(chatLine(`${message.data.username}:`, message.data.color, ` ${message.data.message}`));
+      }
+    })
+    document.querySelector("#chatwrap").scrollTop = document.querySelector("#chatwrap").scrollHeight;
 	});
 
   socket.on('confirm_delete_layer', data => {
@@ -257,6 +265,15 @@ function setup() {
       console.log(`admin ${data.username} cleared layer`)
 	});
 
+  socket.on('confirm_canvas_resize', data => {
+      //createNewLayer()
+      ACTION_QUEUE.push({
+        type: "NEW_STROKE",
+        action: data
+      })
+      console.log(`admin ${data.username} has resized the canvas`)
+	});
+
     // when disconnect we will remove them
 	socket.on('user_disconnect', data => {
         console.log(`${data.username} has left.`);
@@ -264,7 +281,6 @@ function setup() {
 	})
     socket.on('user_join', data => {
         console.log(`${data.username} has joined.`);
-        USER_LABELS.push({socket: data.socket_id, username: data.username, color: data.color, x: 0, y: 0, show: false})
         document.querySelector("#chatwrap ul").append(chatLine(data.username, data.color, ' has joined.'));
 	})
     socket.on('receive_chat_message', data => {
@@ -299,7 +315,6 @@ function setup() {
   alphaSlider = select('#alpha-picker');
   const stroke_width_picker = select('#stroke-width-picker'),
         stroke_label = document.querySelector('#current_stroke_width'),
-        layer_select = select('#layer_select'),
         pen_button = select('#pen'),
         pencil_button = select('#pencil'),
         eraser_button = select('#eraser'),
@@ -422,6 +437,33 @@ function setup() {
           list.append(li)
         })
     })
+    
+    document.querySelector(`[data-action="change-canvas-size"]`).addEventListener("click", (event) => {
+      if (ADMIN || HOST) {  
+        event.target.parentNode.classList.remove("show");
+        document.body.classList.add("modal-open")
+          let modal = document.querySelector("#canvas-size"),
+              new_width = modal.querySelector("#new-width"),
+              new_height = modal.querySelector(`#new-height`);
+          modal.classList.remove("hide");
+          new_width.value = cWidth;
+          new_height.value = cHeight;
+          modal.querySelector("button").addEventListener("click", function() {
+            if (new_width.value == cWidth && new_height.value == cHeight) {
+              alert("You didn't change the canvas size.");
+              new_width.focus()
+            } else if ((new_width.value < 50 || new_height.value < 50 || new_width.value > 1500 || new_height.value > 1500)) {
+              alert("Invalid size. Canvas must be between 50x50 and 1500x1500")
+              new_width.focus()
+            } else {
+              request_canvas_resize(parseInt(new_width.value),parseInt(new_height.value))
+              modal.classList.add('hide');
+              document.querySelector("#art canvas").focus();
+              document.body.classList.remove("modal-open")
+            }
+          });
+        }
+    })
 
     document.querySelector(`[data-action="save-canvas"]`).addEventListener("click", (event) => {
       event.target.parentNode.classList.remove("show");
@@ -485,6 +527,25 @@ function request_add_layer() {
         finalized: true,
     }
   socket.emit('request_add_layer',action)
+}
+
+function request_canvas_resize(width,height) {
+  action_cnt++;
+  let action = {
+        id: genActId(),
+        username: user,
+        timestamp : Date.now(),
+        type: 'resize_canvas',
+        new_width: width,
+        new_height: height,
+        old_width: cWidth,
+        old_height: cHeight,
+        baked: false,
+        undid: false,
+        finalized: true,
+        layer: 0
+    }
+  socket.emit('request_canvas_resize',action)
 }
 
 function request_clear_layer(layer) {
@@ -1021,7 +1082,6 @@ function sendChatMessage() {
     let message = document.querySelector("#chatmsg");
     if (message.value.length > 0) {
         let data = {
-            type: 'normal',
             username: user,
             color: ucolor,
             message: message.value

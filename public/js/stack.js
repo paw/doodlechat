@@ -4,15 +4,18 @@ function performAction(event) {
       // push stroke
       //console.log(`layers before:`,LAYERS[event.action.layer].stroke_history)
       
-      if(event.action.type == 'delete_layer' || event.action.type == 'add_layer' || event.action.type == 'clear_layer') {
+      if(event.action.type == 'delete_layer' || event.action.type == 'add_layer' || event.action.type == 'clear_layer' || event.action.type == 'resize_canvas') {
         console.log("EVENT",event,event.action.layer,LAYERS[event.action.layer])
         try {
           if(event.action.type == 'delete_layer') {
             deleteCurrentLayer(event.action.layer)
           } else if (event.action.type == 'add_layer') {
             createNewLayer()
-          } else {
+          } else if (event.action.type == 'clear_layer') {
             clearLayer(event.action.layer,event.action.new_index);
+            LAYERS[event.action.layer].stroke_history.push(event.action)
+          } else {
+            changeDrawingAreaSize(event.action.new_width, event.action.new_height)
             LAYERS[event.action.layer].stroke_history.push(event.action)
           }
         } catch(err) {
@@ -235,8 +238,10 @@ function redrawLayer(layer) {
     
     for (let i = layer.history_start[layer.history_start.length-1]; i < layer.stroke_history.length; i++) {
       one_bake = layer.stroke_history[i]
-      if(!one_bake.undid && one_bake.type != 'clear_layer') {
-        if(one_bake.type == 'eraser') {
+      if(!one_bake.undid) {
+        if (one_bake.type == 'clear_layer' || one_bake.type == 'resize_canvas') {
+          // do nothing :) we just save this for records
+        } else if (one_bake.type == 'eraser') {
           temp_image.mask(one_bake.img);
         }
         else {
@@ -301,7 +306,7 @@ function createNewLayer() {
 function changeDrawingAreaSize(x, y) {
 
   // clamping canvas size
-  if (x < 50 || y < 50 || x > 1000 || y > 1000) {
+  if (x < 50 || y < 50 || x > 1500 || y > 1500) {
     console.log("new canvas dims too big or too small");
     return;
   }

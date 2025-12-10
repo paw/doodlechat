@@ -30,11 +30,14 @@
             <button class="close btn" onclick="this.parentNode.classList.add('hide')">Cancel</button>
             </div>
         <div id="canvas-size" class="modal hide">
-            <h2>Change Canvas Size:</h2>
-            <div class="grid 2-col">
-                <label for="new-width">Width:</label><input type="number" min="50" max="1500" id="new-width">
-                <label for="new-height">Height:</label><input type="number" min="50" max="1500" id="new-height">
-                <button id="request-new-dims">Change Canvas Size</button>
+            <div class="inner">
+                <h2>Change Canvas Size:</h2>
+                <div class="grid 2-col">
+                    <label for="new-width">Width:</label><input type="number" min="50" max="1500" id="new-width">
+                    <label for="new-height">Height:</label><input type="number" min="50" max="1500" id="new-height">
+                    <button id="request-new-dims">Change Canvas Size</button>
+                </div>
+                <button class="close btn" onclick="this.parentNode.classList.add('hide')">Cancel</button>
             </div>
         </div>
     </div>
