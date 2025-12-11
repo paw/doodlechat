@@ -155,10 +155,10 @@ function setup() {
             block.classList ="user";
             if (user.host) {
               block.classList.add("host");
-              block.innerHTML += `<i class="fa-sharp-duotone fa-regular fa-crown" title="Host"></i>`
+              block.innerHTML += `<i class="fa-solid fa-crown" title="Host"></i>`
             } else if (user.admin) {
               block.classList.add("admin");
-              block.innerHTML += `<i class="fa-sharp-duotone fa-regular fa-chess-knight-piece" title="Admin"></i>`
+              block.innerHTML += `<i class="fa-solid fa-chess-knight" title="Admin"></i>`
             }
             if(HOST && user.socket_id != socket.id) {
               // add host controls

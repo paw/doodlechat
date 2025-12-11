@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%- title %></title>
     <link rel="stylesheet" href="/css/main.css" type="text/css">
-    <script src="https://kit.fontawesome.com/4af4a76265.js" crossorigin="anonymous"></script>
+    <!-- Font Awesome Free 7.1.0: https://github.com/FortAwesome/Font-Awesome/blob/master/LICENSE.txt -->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v7.1.0/css/all.css" crossorigin="anonymous">
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/2.0.5/p5.min.js"></script>
 </head>
@@ -26,9 +27,9 @@
                 <ul id="layerlist">
                 </ul>
                 <li class="hide" data-name="template">Layer <span data-name="number"></span>. <button>Change</button><div>Users:<br><span data-name="users"></span></div></li>
+                <button class="close btn" onclick="this.parentNode.parentNode.classList.add('hide')">Cancel</button>
             </div>
-            <button class="close btn" onclick="this.parentNode.classList.add('hide')">Cancel</button>
-            </div>
+        </div>
         <div id="canvas-size" class="modal hide">
             <div class="inner">
                 <h2>Change Canvas Size:</h2>
@@ -37,7 +38,7 @@
                     <label for="new-height">Height:</label><input type="number" min="50" max="1500" id="new-height">
                     <button id="request-new-dims">Change Canvas Size</button>
                 </div>
-                <button class="close btn" onclick="this.parentNode.classList.add('hide')">Cancel</button>
+                <button class="close btn" onclick="this.parentNode.parentNode.classList.add('hide')">Cancel</button>
             </div>
         </div>
     </div>
