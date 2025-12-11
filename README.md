@@ -1,4 +1,4 @@
-<img width="1915" height="884" alt="capstone" src="https://github.com/user-attachments/assets/261b575d-3a34-4d6d-b4bf-4d143b6a7e7a" />
+<img width="1915" height="884" alt="capstone" src="https://github.com/user-attachments/assets/b9f075c8-f660-43e5-93bf-8c3e7cf7860e" />
 
 # DoodleChat
 
