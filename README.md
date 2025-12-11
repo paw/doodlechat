@@ -1,4 +1,4 @@
-<img width="1915" height="884" alt="capstone" src="https://github.com/user-attachments/assets/b9f075c8-f660-43e5-93bf-8c3e7cf7860e" />
+<img width="1915" height="884" alt="capstone" src="https://github.com/user-attachments/assets/e821e5a9-04c3-4e4b-86c5-2ea97f69321e" />
 
 # DoodleChat
 
@@ -8,9 +8,10 @@ Made in Fall 2025 for SUNY Polytechnic Undergraduate Degree in Computer Science'
 ## Built with:
 - [Node.js](https://nodejs.org/en)
 - [Express.js](https://expressjs.com/)
+- [Express.js Layouts](https://www.npmjs.com/package/express-ejs-layouts)
 - [Socket.io](https://socket.io/)
 - [P5.js](https://p5js.org/)
-- [Font Awesome (for UI icons)](https://fontawesome.com/)
+- [Font Awesome Free (for UI icons)](https://fontawesome.com/)
 
 ### Some Example Artworks:
 <img width="500" height="500" alt="burger" src="https://github.com/user-attachments/assets/7a805140-9c1a-495e-9de8-46c27dc2df8c" />
