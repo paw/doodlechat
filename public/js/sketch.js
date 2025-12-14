@@ -1041,10 +1041,10 @@ function keyPressed() {
     }
     if (key == UP_ARROW) {
       PANNING = true;
-      PAN.y = -10
+      PAN.y = 10
     }
     if (key == DOWN_ARROW) {
-      PAN.y = 10
+      PAN.y = -10
       PANNING = true;
     }
     if (key == LEFT_ARROW) {
